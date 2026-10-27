@@ -192,13 +192,13 @@ function createMapScene() {
     camera.updateProjectionMatrix();
 
     if (width < 760) {
-      mapGroup.position.set(0.35, 0.8, 0);
+      mapGroup.position.set(0.1, 0.8, 0);
       mapGroup.scale.setScalar(0.88);
     } else if (width < 1080) {
-      mapGroup.position.set(0.9, 0.1, 0);
+      mapGroup.position.set(0.55, 0.1, 0);
       mapGroup.scale.setScalar(1.03);
     } else {
-      mapGroup.position.set(1.9, 0.1, 0);
+      mapGroup.position.set(1.35, 0.1, 0);
       mapGroup.scale.setScalar(1.13);
     }
   }
@@ -260,6 +260,15 @@ function createDeerField() {
   let activeDots = reducedMotion ? totalDots : 0;
   let cachedWidth = 0;
   let cachedHeight = 0;
+  let heatFrame = 0;
+  const heat = {
+    active: false,
+    x: 0,
+    y: 0,
+    targetX: 0,
+    targetY: 0,
+    intensity: 0,
+  };
 
   function randomFor(index) {
     const value = Math.sin(index * 12.9898 + 78.233) * 43758.5453;
@@ -285,6 +294,17 @@ function createDeerField() {
     const spacingX = (rect.width - marginX * 2) / Math.max(1, columns - 1);
     const spacingY = (rect.height - marginY * 2) / Math.max(1, rows - 1);
     const radius = Math.max(1.7, Math.min(4.2, spacingX * 0.13));
+    const heatRadius = Math.max(105, Math.min(190, rect.width * 0.18));
+
+    if (heat.intensity > 0.01) {
+      const halo = context.createRadialGradient(heat.x, heat.y, 0, heat.x, heat.y, heatRadius * 1.22);
+      halo.addColorStop(0, `rgba(255, 120, 68, ${0.32 * heat.intensity})`);
+      halo.addColorStop(0.3, `rgba(255, 199, 88, ${0.2 * heat.intensity})`);
+      halo.addColorStop(0.62, `rgba(205, 224, 128, ${0.09 * heat.intensity})`);
+      halo.addColorStop(1, "rgba(183, 205, 128, 0)");
+      context.fillStyle = halo;
+      context.fillRect(0, 0, rect.width, rect.height);
+    }
 
     for (let index = 0; index < totalDots; index += 1) {
       const column = index % columns;
@@ -294,16 +314,24 @@ function createDeerField() {
       const x = marginX + column * spacingX + offsetX;
       const y = marginY + row * spacingY + offsetY;
       const active = index < activeDots;
+      const distance = Math.hypot(x - heat.x, y - heat.y);
+      const proximity = heat.intensity * Math.max(0, 1 - distance / heatRadius);
+      const heatStrength = Math.pow(proximity, 1.45);
+      const red = Math.round(183 + 72 * heatStrength);
+      const green = Math.round(205 - 79 * heatStrength);
+      const blue = Math.round(128 - 64 * heatStrength);
 
       context.beginPath();
-      context.arc(x, y, active ? radius : radius * 0.72, 0, Math.PI * 2);
-      context.fillStyle = active ? "rgba(183, 205, 128, 0.88)" : "rgba(192, 218, 196, 0.1)";
+      context.arc(x, y, active ? radius * (1 + heatStrength * 1.15) : radius * 0.72, 0, Math.PI * 2);
+      context.fillStyle = active
+        ? `rgba(${red}, ${green}, ${blue}, ${0.84 + heatStrength * 0.16})`
+        : "rgba(192, 218, 196, 0.1)";
       context.fill();
 
-      if (active && index % 17 === 0) {
+      if (active && (index % 17 === 0 || heatStrength > 0.64)) {
         context.beginPath();
-        context.arc(x, y, radius * 2.8, 0, Math.PI * 2);
-        context.strokeStyle = "rgba(183, 205, 128, 0.12)";
+        context.arc(x, y, radius * (2.8 + heatStrength * 1.8), 0, Math.PI * 2);
+        context.strokeStyle = `rgba(255, 170, 82, ${0.1 + heatStrength * 0.24})`;
         context.stroke();
       }
     }
@@ -315,6 +343,40 @@ function createDeerField() {
     activeDots = Math.round(totalDots * clamp(progress));
     draw();
   }
+
+  function setHeatTarget(event) {
+    const rect = canvas.getBoundingClientRect();
+    heat.targetX = clamp(event.clientX - rect.left, 0, rect.width);
+    heat.targetY = clamp(event.clientY - rect.top, 0, rect.height);
+    if (!heat.active) {
+      heat.x = heat.targetX;
+      heat.y = heat.targetY;
+    }
+    heat.active = true;
+    startHeatAnimation();
+  }
+
+  function animateHeat() {
+    heatFrame = 0;
+    const easing = reducedMotion ? 1 : 0.16;
+    heat.x += (heat.targetX - heat.x) * easing;
+    heat.y += (heat.targetY - heat.y) * easing;
+    heat.intensity += ((heat.active ? 1 : 0) - heat.intensity) * (heat.active ? 0.12 : 0.08);
+    draw();
+    if (heat.active || heat.intensity > 0.01) startHeatAnimation();
+  }
+
+  function startHeatAnimation() {
+    if (!heatFrame) heatFrame = requestAnimationFrame(animateHeat);
+  }
+
+  canvas.addEventListener("pointermove", setHeatTarget, { passive: true });
+  canvas.addEventListener("pointerdown", setHeatTarget, { passive: true });
+  canvas.addEventListener("pointerenter", setHeatTarget, { passive: true });
+  canvas.addEventListener("pointerleave", () => {
+    heat.active = false;
+    startHeatAnimation();
+  }, { passive: true });
 
   window.addEventListener("resize", draw, { passive: true });
   draw();

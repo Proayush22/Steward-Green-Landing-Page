@@ -533,6 +533,7 @@ h2 em {
   overflow: hidden;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
+  cursor: crosshair;
 }
 
 .deer-field::after {
@@ -549,6 +550,41 @@ h2 em {
   display: block;
   width: 100%;
   height: 100%;
+  touch-action: none;
+}
+
+.deer-field__hint {
+  position: absolute;
+  top: clamp(1.2rem, 3vw, 2.5rem);
+  left: clamp(1rem, 3vw, 2.5rem);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  background: rgba(5, 13, 9, 0.72);
+  backdrop-filter: blur(8px);
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  word-spacing: 0.16em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.deer-field__hint i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 1px solid var(--lime);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(183, 205, 128, 0.35);
+  animation: scan-pulse 2.2s ease-out infinite;
+}
+
+@keyframes scan-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(183, 205, 128, 0.35); }
+  70%, 100% { box-shadow: 0 0 0 0.8rem rgba(183, 205, 128, 0); }
 }
 
 .deer-field__readout {

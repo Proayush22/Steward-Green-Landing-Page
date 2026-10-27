@@ -1,12 +1,12 @@
-# Steward Green - Experience from Above
+# StewardAir - Aerial Wildlife Intelligence
 
-A creative, scroll-driven landing page concept for Steward Green and StewardAir. The experience uses a WebGL United States map, sequential state highlighting, animated deer-count dots, and flight/coverage storytelling to communicate the scale of the team's deer density work.
+A creative, scroll-driven landing page concept for StewardAir by Steward Green. The experience uses a WebGL United States map, sequential state highlighting, an interactive thermal deer-density field, and flight/coverage storytelling to communicate the scale of the team's deer density work.
 
 ## Highlights
 
 - Three.js WebGL map built from published `us-atlas` state geometry
 - Scroll-driven highlighting for all 16 states represented in the study history
-- Dot-field visualization for approximately 54,820 confirmed deer
+- Cursor-reactive thermal density field for approximately 54,820 confirmed deer
 - Animated project, client, density, flight, and coverage statistics
 - Responsive layout with reduced-motion support and semantic page structure
 - No Mapbox token or paid mapping service required
@@ -43,4 +43,4 @@ The supplied source notes that these cumulative figures include Steward Green wo
 
 ## Brand and content
 
-The visual direction evolves Steward Green's current blue-and-green identity into a darker aerial-data experience. Contact and StewardAir links point to the existing Steward Green website.
+The visual direction evolves Steward Green's current blue-and-green identity into a darker StewardAir aerial-data experience. Contact and service links point to the existing Steward Green website.
