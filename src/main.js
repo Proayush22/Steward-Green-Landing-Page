@@ -1,14 +1,15 @@
 import * as THREE from "three";
 import { geoAlbersUsa, geoCentroid } from "d3-geo";
-import { feature } from "topojson-client";
+import { feature, neighbors } from "topojson-client";
 import statesTopology from "us-atlas/states-10m.json";
+import { getMapStoryProgress } from "./map-story-progress.js";
 import "./style.css";
 
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value));
 const formatNumber = (value) => Math.round(value).toLocaleString("en-US");
 
-const targetStates = [
+const targetStateCatalog = [
   { fips: "34", code: "NJ", name: "New Jersey" },
   { fips: "42", code: "PA", name: "Pennsylvania" },
   { fips: "44", code: "RI", name: "Rhode Island" },
@@ -27,16 +28,104 @@ const targetStates = [
   { fips: "18", code: "IN", name: "Indiana" },
 ];
 
-const targetIndex = new Map(targetStates.map((state, index) => [state.fips, index]));
+let targetStates = [...targetStateCatalog];
+const targetIndex = new Set(targetStateCatalog.map((state) => state.fips));
+const preferredAdjacentNext = new Map([
+  ["21", "39"], // Kentucky → Ohio
+  ["39", "26"], // Ohio → Michigan
+  ["26", "18"], // Michigan → Indiana
+  ["18", "17"], // Indiana → Illinois
+  ["17", "29"], // Illinois → Missouri
+  ["29", "05"], // Missouri → Arkansas
+  ["05", "40"], // Arkansas → Oklahoma
+]);
+// Responsive position controls: adjust these ratios to tune the overview and story framing.
+const mapLayout = {
+  heroShift: 0.045,
+  storyAreaBias: 0.68,
+  boundsPadding: 0.86,
+  rhodeIslandStepScale: 0.9,
+};
 const mapState = {
   activeCount: -1,
   targetMeshes: new Map(),
   targetDots: new Map(),
+  targetCenters: new Map(),
+  targetBounds: new Map(),
   arcs: [],
+  storyProgress: 0,
+  storyEngagement: 0,
+  view: {
+    currentPosition: new THREE.Vector2(),
+    targetPosition: new THREE.Vector2(),
+    currentScale: 1,
+    targetScale: 1,
+    initialized: false,
+    heroPosition: new THREE.Vector2(),
+    heroScale: 1,
+    focalPoint: new THREE.Vector2(),
+  },
 };
 
 function normalizeFips(value) {
   return String(value).padStart(2, "0");
+}
+
+function orderStatesByAdjacency(catalog, topology, stateFeatures, projection) {
+  const geometries = topology.objects.states.geometries;
+  const stateIndices = new Map(geometries.map((geometry, index) => [normalizeFips(geometry.id), index]));
+  const featureByFips = new Map(stateFeatures.map((stateFeature) => [normalizeFips(stateFeature.id), stateFeature]));
+  const adjacentIndices = neighbors(geometries);
+  const centers = new Map(catalog.map((state) => {
+    const stateFeature = featureByFips.get(state.fips);
+    const center = stateFeature ? projection(geoCentroid(stateFeature)) : null;
+    return [state.fips, center ? new THREE.Vector2(center[0], -center[1]) : null];
+  }));
+  const remaining = new Map(catalog.map((state) => [state.fips, state]));
+  const sequence = [];
+  let current = remaining.get("34");
+  if (!current) return [...catalog];
+
+  sequence.push(current);
+  remaining.delete(current.fips);
+
+  while (remaining.size) {
+    const currentIndex = stateIndices.get(current.fips);
+    const neighboringIndices = new Set(adjacentIndices[currentIndex] ?? []);
+    const touchingStates = [...remaining.values()].filter((state) => {
+      const index = stateIndices.get(state.fips);
+      return index !== undefined && neighboringIndices.has(index);
+    });
+    const preferredNext = remaining.get(preferredAdjacentNext.get(current.fips));
+    const candidates = preferredNext && touchingStates.includes(preferredNext)
+      ? [preferredNext]
+      : touchingStates.length
+        ? touchingStates
+        : [...remaining.values()];
+    const currentCenter = centers.get(current.fips);
+    candidates.sort((a, b) => {
+      const centerA = centers.get(a.fips);
+      const centerB = centers.get(b.fips);
+      if (!currentCenter || !centerA || !centerB) return a.fips.localeCompare(b.fips);
+      return centerA.distanceToSquared(currentCenter) - centerB.distanceToSquared(currentCenter);
+    });
+
+    current = candidates[0];
+    sequence.push(current);
+    remaining.delete(current.fips);
+  }
+
+  return sequence;
+}
+
+function syncStateSequenceList() {
+  const list = document.getElementById("state-sequence");
+  if (!list) return;
+  const items = new Map([...list.children].map((item) => [item.dataset.fips, item]));
+  targetStates.forEach((state) => {
+    const item = items.get(state.fips);
+    if (item) list.appendChild(item);
+  });
 }
 
 function setPathFromRing(ring, projection, expectClockwise) {
@@ -92,12 +181,15 @@ function createMapScene() {
   const states = feature(statesTopology, statesTopology.objects.states).features;
   const collection = { type: "FeatureCollection", features: states };
   const projection = geoAlbersUsa().fitExtent([[-3.7, -2.35], [3.7, 2.35]], collection);
+  targetStates = orderStatesByAdjacency(targetStateCatalog, statesTopology, states, projection);
+  syncStateSequenceList();
 
   states.forEach((stateFeature) => {
     const fips = normalizeFips(stateFeature.id);
     const isTarget = targetIndex.has(fips);
     const geometry = geometryForFeature(stateFeature, projection);
     if (!geometry) return;
+    geometry.computeBoundingBox();
 
     const material = new THREE.MeshBasicMaterial({
       color: isTarget ? 0x5a2522 : 0x232326,
@@ -124,8 +216,17 @@ function createMapScene() {
 
     if (isTarget) {
       mapState.targetMeshes.set(fips, { material, edgeMaterial: edges.material });
+      if (geometry.boundingBox) {
+        mapState.targetBounds.set(fips, {
+          minX: geometry.boundingBox.min.x,
+          maxX: geometry.boundingBox.max.x,
+          minY: geometry.boundingBox.min.y,
+          maxY: geometry.boundingBox.max.y,
+        });
+      }
       const center = projection(geoCentroid(stateFeature));
       if (center) {
+        mapState.targetCenters.set(fips, new THREE.Vector2(center[0], -center[1]));
         const dot = new THREE.Mesh(
           new THREE.CircleGeometry(0.045, 24),
           new THREE.MeshBasicMaterial({ color: 0xd9685e, transparent: true, opacity: 0.1, depthWrite: false }),
@@ -138,30 +239,26 @@ function createMapScene() {
     }
   });
 
-  const originFeature = states.find((state) => normalizeFips(state.id) === "34");
-  const originPoint = projection(geoCentroid(originFeature));
-  if (originPoint) {
-    targetStates.slice(1).forEach((state, index) => {
-      const destinationFeature = states.find((candidate) => normalizeFips(candidate.id) === state.fips);
-      const destinationPoint = destinationFeature ? projection(geoCentroid(destinationFeature)) : null;
-      if (!destinationPoint) return;
+  targetStates.slice(1).forEach((state, index) => {
+    const previousCenter = mapState.targetCenters.get(targetStates[index].fips);
+    const destinationCenter = mapState.targetCenters.get(state.fips);
+    if (!previousCenter || !destinationCenter) return;
 
-      const start = new THREE.Vector3(originPoint[0], -originPoint[1], 0.05);
-      const end = new THREE.Vector3(destinationPoint[0], -destinationPoint[1], 0.05);
-      const midpoint = start.clone().lerp(end, 0.5);
-      midpoint.z = 0.22 + start.distanceTo(end) * 0.08;
-      const curve = new THREE.QuadraticBezierCurve3(start, midpoint, end);
-      const points = curve.getPoints(54);
-      const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      geometry.setDrawRange(0, 0);
-      const line = new THREE.Line(
-        geometry,
-        new THREE.LineBasicMaterial({ color: 0xd9685e, transparent: true, opacity: 0.34, depthWrite: false }),
-      );
-      mapGroup.add(line);
-      mapState.arcs.push({ line, stateIndex: index + 1, pointCount: points.length });
-    });
-  }
+    const start = new THREE.Vector3(previousCenter.x, previousCenter.y, 0.05);
+    const end = new THREE.Vector3(destinationCenter.x, destinationCenter.y, 0.05);
+    const midpoint = start.clone().lerp(end, 0.5);
+    midpoint.z = 0.22 + start.distanceTo(end) * 0.08;
+    const curve = new THREE.QuadraticBezierCurve3(start, midpoint, end);
+    const points = curve.getPoints(54);
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    geometry.setDrawRange(0, 0);
+    const line = new THREE.Line(
+      geometry,
+      new THREE.LineBasicMaterial({ color: 0xd9685e, transparent: true, opacity: 0.34, depthWrite: false }),
+    );
+    mapGroup.add(line);
+    mapState.arcs.push({ line, stateIndex: index + 1, pointCount: points.length });
+  });
 
   const particleCount = 210;
   const positions = new Float32Array(particleCount * 3);
@@ -184,23 +281,89 @@ function createMapScene() {
     pointer.y = event.clientY / window.innerHeight - 0.5;
   }, { passive: true });
 
+  function setStoryView(progress = mapState.storyProgress, engagement = mapState.storyEngagement) {
+    const activeCount = Math.max(1, Math.min(targetStates.length, Math.floor(progress * targetStates.length) + 1));
+    const indianaIndex = targetStates.findIndex((state) => state.fips === "18");
+    const frameCount = Math.min(activeCount, indianaIndex + 1);
+    const revealedCenters = targetStates
+      .slice(0, frameCount)
+      .map((state) => mapState.targetCenters.get(state.fips))
+      .filter(Boolean);
+
+    if (!revealedCenters.length) return;
+
+    const boundsFor = (stateList) => stateList
+      .map((state) => mapState.targetBounds.get(state.fips))
+      .filter(Boolean)
+      .reduce((result, item) => ({
+        minX: Math.min(result.minX, item.minX),
+        maxX: Math.max(result.maxX, item.maxX),
+        minY: Math.min(result.minY, item.minY),
+        maxY: Math.max(result.maxY, item.maxY),
+      }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+    const bounds = boundsFor(targetStates.slice(0, frameCount));
+    const center = new THREE.Vector2(
+      (bounds.minX + bounds.maxX) / 2,
+      (bounds.minY + bounds.maxY) / 2,
+    );
+    const viewHeight = 2 * camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const viewWidth = viewHeight * camera.aspect;
+    const copyWidth = Math.min(640, window.innerWidth * 0.48);
+    const openMapLeft = -viewWidth / 2 + viewWidth * (copyWidth / window.innerWidth) + viewWidth * 0.04;
+    const openMapRight = viewWidth / 2 - viewWidth * 0.04;
+    const openMapCenter = THREE.MathUtils.lerp(openMapLeft, openMapRight, mapLayout.storyAreaBias);
+    const openMapWidth = 2 * Math.min(openMapCenter - openMapLeft, openMapRight - openMapCenter) * mapLayout.boundsPadding;
+    const fitScale = Math.min(
+      openMapWidth / Math.max(0.01, bounds.maxX - bounds.minX),
+      (viewHeight * 0.7) / Math.max(0.01, bounds.maxY - bounds.minY),
+      5.2,
+    );
+    const rhodeIslandIsVisible = targetStates
+      .slice(0, frameCount)
+      .some((state) => state.fips === "44");
+    const northeastScale = rhodeIslandIsVisible ? mapLayout.rhodeIslandStepScale : 1;
+    const storyScale = fitScale * northeastScale;
+    const storyPosition = mapState.view.focalPoint.clone().setX(openMapCenter).sub(center.multiplyScalar(storyScale));
+
+    mapState.view.targetScale = THREE.MathUtils.lerp(mapState.view.heroScale, storyScale, engagement);
+    mapState.view.targetPosition.lerpVectors(mapState.view.heroPosition, storyPosition, engagement);
+  }
+
   function resize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    const viewHeight = 2 * camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const viewWidth = viewHeight * camera.aspect;
 
     if (width < 760) {
-      mapGroup.position.set(0.1, 0.8, 0);
-      mapGroup.scale.setScalar(0.88);
+      mapState.view.heroPosition.set(viewWidth * mapLayout.heroShift, 0);
+      mapState.view.heroScale = Math.min(0.92, (viewWidth * 0.9) / 7.4, (viewHeight * 0.88) / 4.7);
+      mapState.view.focalPoint.set(0, 0);
     } else if (width < 1080) {
-      mapGroup.position.set(0.55, 0.1, 0);
-      mapGroup.scale.setScalar(1.03);
+      mapState.view.heroPosition.set(viewWidth * mapLayout.heroShift, 0);
+      mapState.view.heroScale = Math.min(0.92, (viewWidth * 0.9) / 7.4, (viewHeight * 0.88) / 4.7);
+      const copyWidth = Math.min(640, width * 0.48);
+      const openMapLeft = -viewWidth / 2 + viewWidth * (copyWidth / width) + viewWidth * 0.04;
+      const openMapRight = viewWidth / 2 - viewWidth * 0.04;
+      mapState.view.focalPoint.set(THREE.MathUtils.lerp(openMapLeft, openMapRight, mapLayout.storyAreaBias), 0);
     } else {
-      mapGroup.position.set(1.35, 0.1, 0);
-      mapGroup.scale.setScalar(1.13);
+      mapState.view.heroPosition.set(viewWidth * mapLayout.heroShift, 0);
+      mapState.view.heroScale = Math.min(0.92, (viewWidth * 0.9) / 7.4, (viewHeight * 0.88) / 4.7);
+      const copyWidth = Math.min(640, width * 0.48);
+      const openMapLeft = -viewWidth / 2 + viewWidth * (copyWidth / width) + viewWidth * 0.04;
+      const openMapRight = viewWidth / 2 - viewWidth * 0.04;
+      mapState.view.focalPoint.set(THREE.MathUtils.lerp(openMapLeft, openMapRight, mapLayout.storyAreaBias), 0);
     }
+
+    if (!mapState.view.initialized) {
+      mapState.view.currentScale = mapState.view.heroScale;
+      mapState.view.currentPosition.copy(mapState.view.heroPosition);
+      mapState.view.initialized = true;
+    }
+    setStoryView();
   }
 
   function render(time) {
@@ -208,6 +371,11 @@ function createMapScene() {
     const drift = reducedMotion ? 0 : Math.sin(seconds * 0.18) * 0.015;
     mapGroup.rotation.y += ((pointer.x * 0.06) - mapGroup.rotation.y) * 0.035;
     mapGroup.rotation.x += ((-0.08 - pointer.y * 0.035 + drift) - mapGroup.rotation.x) * 0.035;
+    const viewEase = reducedMotion ? 1 : 0.07;
+    mapState.view.currentScale += (mapState.view.targetScale - mapState.view.currentScale) * viewEase;
+    mapState.view.currentPosition.lerp(mapState.view.targetPosition, viewEase);
+    mapGroup.position.set(mapState.view.currentPosition.x, mapState.view.currentPosition.y, 0);
+    mapGroup.scale.setScalar(mapState.view.currentScale);
     particles.rotation.z = reducedMotion ? 0 : seconds * 0.002;
     renderer.render(scene, camera);
     requestAnimationFrame(render);
@@ -217,11 +385,18 @@ function createMapScene() {
   window.addEventListener("resize", resize, { passive: true });
   requestAnimationFrame(render);
 
-  return { mapGroup, mount };
+  return { mapGroup, mount, setStoryView };
 }
 
-function setMapProgress(progress) {
-  const activeCount = reducedMotion ? targetStates.length : Math.min(targetStates.length, Math.ceil(progress * targetStates.length));
+function setMapProgress(progress, engagement, setStoryView) {
+  mapState.storyProgress = progress;
+  mapState.storyEngagement = engagement;
+  const activeCount = reducedMotion
+    ? targetStates.length
+    : engagement >= 0.98
+      ? Math.min(targetStates.length, Math.floor(progress * targetStates.length) + 1)
+      : 0;
+  setStoryView(progress, engagement);
   if (activeCount === mapState.activeCount) return;
   mapState.activeCount = activeCount;
 
@@ -405,7 +580,7 @@ function animateCounter(element) {
   requestAnimationFrame(frame);
 }
 
-const { mount: mapMount } = createMapScene();
+const { mount: mapMount, setStoryView } = createMapScene();
 const deerField = createDeerField();
 const mapStory = document.getElementById("reach");
 const evidence = document.getElementById("evidence");
@@ -426,13 +601,20 @@ const revealObserver = new IntersectionObserver((entries) => {
 document.querySelectorAll(".reveal, [data-counter]").forEach((element) => revealObserver.observe(element));
 
 let scrollTicking = false;
+
 function updateScrollStory() {
   scrollTicking = false;
   const viewportHeight = window.innerHeight;
   const mapRect = mapStory.getBoundingClientRect();
   const mapRange = Math.max(1, mapRect.height - viewportHeight);
-  const mapProgress = clamp(-mapRect.top / mapRange);
-  setMapProgress(mapProgress);
+  // Show the full U.S. until the story panel is in place, then zoom to the first state
+  // before beginning the one-by-one illumination sequence.
+  const storyStartTop = -viewportHeight * 0.05;
+  const storyTravel = storyStartTop - mapRect.top;
+  const zoomRange = viewportHeight * 0.08;
+  const mapProgress = getMapStoryProgress(storyTravel, mapRange, zoomRange);
+  const mapEngagement = reducedMotion ? 1 : clamp(storyTravel / zoomRange);
+  setMapProgress(mapProgress, mapEngagement, setStoryView);
 
   const evidenceRect = evidence.getBoundingClientRect();
   const evidenceProgress = clamp((viewportHeight * 0.82 - evidenceRect.top) / Math.max(1, evidenceRect.height * 0.54));
