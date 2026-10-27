@@ -128,7 +128,7 @@ function createMapScene() {
       if (center) {
         const dot = new THREE.Mesh(
           new THREE.CircleGeometry(0.045, 24),
-          new THREE.MeshBasicMaterial({ color: 0xc8f279, transparent: true, opacity: 0.12, depthWrite: false }),
+          new THREE.MeshBasicMaterial({ color: 0xb7cd80, transparent: true, opacity: 0.1, depthWrite: false }),
         );
         dot.position.set(center[0], -center[1], 0.035);
         dot.scale.setScalar(0.2);
@@ -156,14 +156,14 @@ function createMapScene() {
       geometry.setDrawRange(0, 0);
       const line = new THREE.Line(
         geometry,
-        new THREE.LineBasicMaterial({ color: 0xc8f279, transparent: true, opacity: 0.42, depthWrite: false }),
+        new THREE.LineBasicMaterial({ color: 0xb7cd80, transparent: true, opacity: 0.34, depthWrite: false }),
       );
       mapGroup.add(line);
       mapState.arcs.push({ line, stateIndex: index + 1, pointCount: points.length });
     });
   }
 
-  const particleCount = 420;
+  const particleCount = 210;
   const positions = new Float32Array(particleCount * 3);
   for (let index = 0; index < particleCount; index += 1) {
     positions[index * 3] = (Math.random() - 0.5) * 12;
@@ -174,7 +174,7 @@ function createMapScene() {
   particlesGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   const particles = new THREE.Points(
     particlesGeometry,
-    new THREE.PointsMaterial({ color: 0xc8f279, size: 0.012, transparent: true, opacity: 0.28, depthWrite: false }),
+    new THREE.PointsMaterial({ color: 0xb7cd80, size: 0.01, transparent: true, opacity: 0.14, depthWrite: false }),
   );
   scene.add(particles);
 
@@ -229,9 +229,9 @@ function setMapProgress(progress) {
     const active = index < activeCount;
     const entry = mapState.targetMeshes.get(state.fips);
     if (entry) {
-      entry.material.color.setHex(active ? 0x7ea45c : 0x406b4e);
+      entry.material.color.setHex(active ? 0x8fa969 : 0x3d5a47);
       entry.material.opacity = active ? 0.82 : 0.32;
-      entry.edgeMaterial.color.setHex(active ? 0xc8f279 : 0x93bf75);
+      entry.edgeMaterial.color.setHex(active ? 0xb7cd80 : 0x829d6c);
       entry.edgeMaterial.opacity = active ? 0.86 : 0.28;
     }
 
@@ -297,13 +297,13 @@ function createDeerField() {
 
       context.beginPath();
       context.arc(x, y, active ? radius : radius * 0.72, 0, Math.PI * 2);
-      context.fillStyle = active ? "rgba(200, 242, 121, 0.9)" : "rgba(192, 218, 196, 0.11)";
+      context.fillStyle = active ? "rgba(183, 205, 128, 0.88)" : "rgba(192, 218, 196, 0.1)";
       context.fill();
 
       if (active && index % 17 === 0) {
         context.beginPath();
         context.arc(x, y, radius * 2.8, 0, Math.PI * 2);
-        context.strokeStyle = "rgba(200, 242, 121, 0.14)";
+        context.strokeStyle = "rgba(183, 205, 128, 0.12)";
         context.stroke();
       }
     }
