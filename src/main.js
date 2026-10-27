@@ -100,7 +100,7 @@ function createMapScene() {
     if (!geometry) return;
 
     const material = new THREE.MeshBasicMaterial({
-      color: isTarget ? 0x406b4e : 0x1c3328,
+      color: isTarget ? 0x5a2522 : 0x232326,
       transparent: true,
       opacity: isTarget ? 0.36 : 0.12,
       side: THREE.DoubleSide,
@@ -113,7 +113,7 @@ function createMapScene() {
     const edges = new THREE.LineSegments(
       new THREE.EdgesGeometry(geometry, 18),
       new THREE.LineBasicMaterial({
-        color: isTarget ? 0x93bf75 : 0x567262,
+        color: isTarget ? 0x9a4a44 : 0x4a4849,
         transparent: true,
         opacity: isTarget ? 0.34 : 0.16,
         depthWrite: false,
@@ -128,7 +128,7 @@ function createMapScene() {
       if (center) {
         const dot = new THREE.Mesh(
           new THREE.CircleGeometry(0.045, 24),
-          new THREE.MeshBasicMaterial({ color: 0xb7cd80, transparent: true, opacity: 0.1, depthWrite: false }),
+          new THREE.MeshBasicMaterial({ color: 0xd9685e, transparent: true, opacity: 0.1, depthWrite: false }),
         );
         dot.position.set(center[0], -center[1], 0.035);
         dot.scale.setScalar(0.2);
@@ -156,7 +156,7 @@ function createMapScene() {
       geometry.setDrawRange(0, 0);
       const line = new THREE.Line(
         geometry,
-        new THREE.LineBasicMaterial({ color: 0xb7cd80, transparent: true, opacity: 0.34, depthWrite: false }),
+        new THREE.LineBasicMaterial({ color: 0xd9685e, transparent: true, opacity: 0.34, depthWrite: false }),
       );
       mapGroup.add(line);
       mapState.arcs.push({ line, stateIndex: index + 1, pointCount: points.length });
@@ -174,7 +174,7 @@ function createMapScene() {
   particlesGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   const particles = new THREE.Points(
     particlesGeometry,
-    new THREE.PointsMaterial({ color: 0xb7cd80, size: 0.01, transparent: true, opacity: 0.14, depthWrite: false }),
+    new THREE.PointsMaterial({ color: 0xc14a42, size: 0.01, transparent: true, opacity: 0.14, depthWrite: false }),
   );
   scene.add(particles);
 
@@ -229,9 +229,9 @@ function setMapProgress(progress) {
     const active = index < activeCount;
     const entry = mapState.targetMeshes.get(state.fips);
     if (entry) {
-      entry.material.color.setHex(active ? 0x8fa969 : 0x3d5a47);
+      entry.material.color.setHex(active ? 0xa93630 : 0x542522);
       entry.material.opacity = active ? 0.82 : 0.32;
-      entry.edgeMaterial.color.setHex(active ? 0xb7cd80 : 0x829d6c);
+      entry.edgeMaterial.color.setHex(active ? 0xe07167 : 0x8a4a45);
       entry.edgeMaterial.opacity = active ? 0.86 : 0.28;
     }
 
@@ -298,10 +298,10 @@ function createDeerField() {
 
     if (heat.intensity > 0.01) {
       const halo = context.createRadialGradient(heat.x, heat.y, 0, heat.x, heat.y, heatRadius * 1.22);
-      halo.addColorStop(0, `rgba(255, 120, 68, ${0.32 * heat.intensity})`);
-      halo.addColorStop(0.3, `rgba(255, 199, 88, ${0.2 * heat.intensity})`);
-      halo.addColorStop(0.62, `rgba(205, 224, 128, ${0.09 * heat.intensity})`);
-      halo.addColorStop(1, "rgba(183, 205, 128, 0)");
+      halo.addColorStop(0, `rgba(224, 69, 59, ${0.34 * heat.intensity})`);
+      halo.addColorStop(0.3, `rgba(181, 58, 50, ${0.24 * heat.intensity})`);
+      halo.addColorStop(0.62, `rgba(217, 104, 94, ${0.1 * heat.intensity})`);
+      halo.addColorStop(1, "rgba(181, 58, 50, 0)");
       context.fillStyle = halo;
       context.fillRect(0, 0, rect.width, rect.height);
     }
@@ -317,21 +317,21 @@ function createDeerField() {
       const distance = Math.hypot(x - heat.x, y - heat.y);
       const proximity = heat.intensity * Math.max(0, 1 - distance / heatRadius);
       const heatStrength = Math.pow(proximity, 1.45);
-      const red = Math.round(183 + 72 * heatStrength);
-      const green = Math.round(205 - 79 * heatStrength);
-      const blue = Math.round(128 - 64 * heatStrength);
+      const red = Math.round(196 + 55 * heatStrength);
+      const green = Math.round(195 - 87 * heatStrength);
+      const blue = Math.round(190 - 92 * heatStrength);
 
       context.beginPath();
       context.arc(x, y, active ? radius * (1 + heatStrength * 1.15) : radius * 0.72, 0, Math.PI * 2);
       context.fillStyle = active
         ? `rgba(${red}, ${green}, ${blue}, ${0.84 + heatStrength * 0.16})`
-        : "rgba(192, 218, 196, 0.1)";
+        : "rgba(210, 205, 202, 0.1)";
       context.fill();
 
       if (active && (index % 17 === 0 || heatStrength > 0.64)) {
         context.beginPath();
         context.arc(x, y, radius * (2.8 + heatStrength * 1.8), 0, Math.PI * 2);
-        context.strokeStyle = `rgba(255, 170, 82, ${0.1 + heatStrength * 0.24})`;
+        context.strokeStyle = `rgba(224, 69, 59, ${0.12 + heatStrength * 0.28})`;
         context.stroke();
       }
     }

@@ -43,4 +43,4 @@ The supplied source notes that these cumulative figures include Steward Green wo
 
 ## Brand and content
 
-The visual direction evolves Steward Green's current blue-and-green identity into a darker StewardAir aerial-data experience. Contact and service links point to the existing Steward Green website.
+The visual direction follows the supplied StewardAir identity: a black, white, and aviation-red palette anchored by the official "Applied Aerial Intelligence" wordmark. Contact and service links point to the existing Steward Green website.
