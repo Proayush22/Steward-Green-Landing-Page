@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Explore the scale of Steward Green's aerial deer density experience through an interactive map and scroll-driven field statistics."
+    />
+    <meta name="theme-color" content="#07150f" />
+    <title>Steward Green | Experience from Above</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+
+    <div id="webgl-scene" class="webgl-scene" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+
+    <header class="site-header" id="site-header">
+      <a class="wordmark" href="#top" aria-label="Steward Green home">
+        <span class="wordmark__steward">Steward</span><span class="wordmark__green">Green</span>
+        <span class="wordmark__sub">Wildlife habitat solutions</span>
+      </a>
+      <nav class="main-nav" aria-label="Primary navigation">
+        <a href="#reach">Reach</a>
+        <a href="#evidence">Experience</a>
+        <a href="#flight">Flight effort</a>
+      </nav>
+      <a class="header-cta" href="https://www.stewardgreen.com/contact">Start a study</a>
+    </header>
+
+    <main id="main-content">
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="hero__eyebrow reveal">Aerial intelligence for wildlife decisions</div>
+        <div class="hero__copy">
+          <h1 id="hero-title" class="reveal">
+            Experience you can<br />
+            <em>see from above.</em>
+          </h1>
+          <p class="hero__lede reveal">
+            Steward Green turns thermal flights and geospatial analysis into defensible deer density insights - helping land stewards act with clarity.
+          </p>
+          <div class="hero__actions reveal">
+            <a class="button button--primary" href="#reach">Explore the footprint</a>
+            <a class="text-link" href="https://www.stewardgreen.com/stewardair">Discover StewardAir <span aria-hidden="true">&nearr;</span></a>
+          </div>
+        </div>
+
+        <aside class="hero__proof reveal" aria-label="Deer density experience through 2026">
+          <span class="hero__proof-label">Deer confirmed to date</span>
+          <strong class="hero__proof-value" data-counter="54820">54,820</strong>
+          <span class="hero__proof-note">Across 312 project areas</span>
+        </aside>
+
+        <div class="hero__scroll" aria-hidden="true">
+          <span>Scroll to trace the work</span>
+          <i></i>
+        </div>
+      </section>
+
+      <section class="map-story" id="reach" aria-labelledby="reach-title">
+        <div class="map-story__sticky">
+          <div class="section-kicker">01 / National footprint</div>
+          <h2 id="reach-title">Sixteen states.<br /><em>One field-tested method.</em></h2>
+          <p>
+            From New England to the Midwest and South, each highlighted state represents completed deer density work and a landscape turned into usable evidence.
+          </p>
+          <div class="map-progress" aria-live="polite">
+            <strong id="map-progress-count">0 of 16</strong>
+            <span>states illuminated</span>
+          </div>
+          <ol class="state-sequence" id="state-sequence" aria-label="States represented in the work">
+            <li data-fips="34">New Jersey</li>
+            <li data-fips="42">Pennsylvania</li>
+            <li data-fips="44">Rhode Island</li>
+            <li data-fips="09">Connecticut</li>
+            <li data-fips="17">Illinois</li>
+            <li data-fips="29">Missouri</li>
+            <li data-fips="05">Arkansas</li>
+            <li data-fips="51">Virginia</li>
+            <li data-fips="24">Maryland</li>
+            <li data-fips="39">Ohio</li>
+            <li data-fips="21">Kentucky</li>
+            <li data-fips="40">Oklahoma</li>
+            <li data-fips="36">New York</li>
+            <li data-fips="26">Michigan</li>
+            <li data-fips="10">Delaware</li>
+            <li data-fips="18">Indiana</li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="evidence" id="evidence" aria-labelledby="evidence-title">
+        <div class="section-kicker reveal">02 / Evidence at scale</div>
+        <div class="evidence__intro reveal">
+          <h2 id="evidence-title">One point for every<br /><em>100 deer confirmed.</em></h2>
+          <p>
+            The view fills as you move through it: a field of more than five hundred observations groups, each standing for one hundred confirmed deer.
+          </p>
+        </div>
+
+        <div class="deer-field reveal">
+          <canvas id="deer-canvas" role="img" aria-label="Dot field representing approximately 54,820 confirmed deer, where each point represents 100 deer"></canvas>
+          <div class="deer-field__readout">
+            <span>Approximate deer confirmed</span>
+            <strong id="deer-count">0</strong>
+            <small>Each point = 100 deer</small>
+          </div>
+        </div>
+
+        <div class="stat-ribbon reveal" aria-label="Program scale">
+          <article>
+            <strong data-counter="312">312</strong>
+            <span>Project areas</span>
+            <p>One client can include several parks.</p>
+          </article>
+          <article>
+            <strong data-counter="38">38</strong>
+            <span>Separate clients</span>
+            <p>Public, private, and institutional landscapes.</p>
+          </article>
+          <article>
+            <strong data-counter="88">88</strong>
+            <span>Deer / mi&sup2; average</span>
+            <p>Across the compiled study history.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="flight" id="flight" aria-labelledby="flight-title">
+        <div class="flight__copy reveal">
+          <div class="section-kicker">03 / Flight effort</div>
+          <h2 id="flight-title">Miles in the air.<br /><em>Decisions on the ground.</em></h2>
+          <p>
+            Field experience is accumulated one mission at a time - planning, flying, confirming, mapping, and reporting the evidence each project needs.
+          </p>
+        </div>
+
+        <div class="flight-route reveal" id="flight-route">
+          <div class="flight-route__label flight-route__label--start">
+            <span>Start</span>
+            <strong>Portland, ME</strong>
+          </div>
+          <div class="flight-route__line" aria-hidden="true">
+            <div class="flight-route__fill"></div>
+            <div class="flight-route__drone">AIR</div>
+          </div>
+          <div class="flight-route__label flight-route__label--end">
+            <span>West, then halfway back</span>
+            <strong>6,452 miles</strong>
+          </div>
+        </div>
+
+        <div class="flight__stats reveal">
+          <article>
+            <span class="flight__index">01</span>
+            <strong><span data-counter="6452">6,452</span> mi</strong>
+            <p>Total UAS flight distance while collecting data.</p>
+          </article>
+          <article>
+            <span class="flight__index">02</span>
+            <strong><span data-counter="624">624</span> hr</strong>
+            <p>Time spent airborne across the study history.</p>
+          </article>
+          <article>
+            <span class="flight__index">03</span>
+            <strong><span data-counter="16">16</span> weeks</strong>
+            <p>The equivalent of sixteen 40-hour work weeks in flight.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="coverage" id="coverage" aria-labelledby="coverage-title">
+        <div class="coverage__visual reveal" aria-hidden="true">
+          <div class="coverage__rings">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="coverage__number">772</div>
+          <div class="coverage__unit">square miles</div>
+        </div>
+
+        <div class="coverage__copy reveal">
+          <div class="section-kicker">04 / Ground covered</div>
+          <h2 id="coverage-title">A footprint larger than a number.</h2>
+          <p class="coverage__lede">
+            <strong>494,080 acres</strong> collected, analyzed, mapped, and reported - equal to <strong>772 square miles</strong>, more than half the area of Rhode Island.
+          </p>
+          <div class="coverage__equation" aria-label="494,080 acres equals 772 square miles">
+            <span>494,080 acres</span>
+            <i aria-hidden="true"></i>
+            <span>772 mi&sup2;</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="closing" aria-labelledby="closing-title">
+        <div class="closing__glow" aria-hidden="true"></div>
+        <div class="section-kicker reveal">StewardAir x Steward Green</div>
+        <h2 id="closing-title" class="reveal">Turn a night flight into<br /><em>a clearer next move.</em></h2>
+        <p class="reveal">
+          Bring defensible wildlife data into planning, policy, habitat restoration, and long-term stewardship.
+        </p>
+        <div class="closing__actions reveal">
+          <a class="button button--primary" href="https://www.stewardgreen.com/contact">Plan a deer density study</a>
+          <a class="text-link" href="https://www.stewardgreen.com">Visit stewardgreen.com <span aria-hidden="true">&nearr;</span></a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="wordmark wordmark--footer" href="#top">
+        <span class="wordmark__steward">Steward</span><span class="wordmark__green">Green</span>
+      </a>
+      <p>
+        Cumulative figures through 2026. Totals reflect Steward Green work and the contributor's professional work completed before Steward Green.
+      </p>
+      <p>&copy; <span id="year"></span> Steward Green. Concept landing page.</p>
+    </footer>
+
+    <noscript>
+      <div class="noscript">Enable JavaScript to experience the interactive map and scroll-driven data story.</div>
+    </noscript>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
