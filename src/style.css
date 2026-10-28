@@ -246,6 +246,11 @@ h2 em {
   font-weight: 400;
 }
 
+.hero__title-line {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
 .hero__lede {
   max-width: 34rem;
   margin: 2rem 0 0;
@@ -1050,14 +1055,31 @@ h2 em {
 }
 
 .reveal {
-  opacity: 0;
-  transform: translateY(2rem);
-  transition: opacity 700ms ease, transform 700ms cubic-bezier(0.2, 0.7, 0.25, 1);
+  opacity: 1;
+  transform: none;
 }
 
-.reveal.is-visible {
-  opacity: 1;
-  transform: translateY(0);
+.motion-ready .reveal {
+  opacity: 0;
+  transform: translateY(2rem);
+}
+
+.motion-ready .hero__credentials > div,
+.motion-ready .stat-ribbon article,
+.motion-ready .flight__stats article,
+.motion-ready .deliverables__grid article {
+  opacity: 0;
+  transform: translateY(1.5rem);
+}
+
+.hero__copy,
+.hero__proof,
+.hero__credentials,
+.map-story__sticky,
+.deer-field,
+.coverage__visual,
+.closing__glow {
+  will-change: transform, opacity;
 }
 
 .noscript {

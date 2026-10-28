@@ -5,6 +5,7 @@ A creative, scroll-driven landing page concept for StewardAir by Steward Green. 
 ## Highlights
 
 - Three.js WebGL map built from published `us-atlas` state geometry
+- Motion by Framer scroll-linked parallax, entrance reveals, and staggered section choreography
 - Scroll-driven highlighting for all 16 states represented in the study history
 - Cursor-reactive thermal density field for approximately 54,820 confirmed deer
 - Animated project, client, density, flight, and coverage statistics

@@ -1,10 +1,12 @@
 import * as THREE from "three";
 import { geoAlbersUsa, geoCentroid } from "d3-geo";
+import { animate, inView, scroll, stagger } from "motion";
 import { feature } from "topojson-client";
 import statesTopology from "us-atlas/states-10m.json";
 import "./style.css";
 
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+if (!reducedMotion) document.documentElement.classList.add("motion-ready");
 const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value));
 const formatNumber = (value) => Math.round(value).toLocaleString("en-US");
 
@@ -394,36 +396,125 @@ function animateCounter(element) {
     return;
   }
 
-  const start = performance.now();
-  const duration = 1250;
-  function frame(now) {
-    const progress = clamp((now - start) / duration);
-    const eased = 1 - Math.pow(1 - progress, 3);
-    element.textContent = formatNumber(target * eased);
-    if (progress < 1) requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
+  animate(0, target, {
+    duration: 1.25,
+    ease: [0.22, 1, 0.36, 1],
+    onUpdate: (value) => {
+      element.textContent = formatNumber(value);
+    },
+  });
 }
 
 const { mount: mapMount } = createMapScene();
 const deerField = createDeerField();
+const hero = document.getElementById("top");
 const mapStory = document.getElementById("reach");
 const evidence = document.getElementById("evidence");
 const flight = document.getElementById("flight");
+const coverage = document.getElementById("coverage");
+const closing = document.querySelector(".closing");
 const siteHeader = document.getElementById("site-header");
 const flightRoute = document.getElementById("flight-route");
 
-const revealObserver = new IntersectionObserver((entries) => {
-  entries.forEach((entry) => {
-    if (!entry.isIntersecting) return;
-    entry.target.classList.add("is-visible");
-    entry.target.querySelectorAll?.("[data-counter]").forEach(animateCounter);
-    if (entry.target.matches?.("[data-counter]")) animateCounter(entry.target);
-    revealObserver.unobserve(entry.target);
-  });
-}, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+function setupMotionAnimations() {
+  if (reducedMotion) {
+    document.documentElement.classList.remove("motion-ready");
+    document.querySelectorAll("[data-counter]").forEach(animateCounter);
+    return;
+  }
 
-document.querySelectorAll(".reveal, [data-counter]").forEach((element) => revealObserver.observe(element));
+  const entranceEase = [0.22, 1, 0.36, 1];
+  const heroItems = [...hero.querySelectorAll(":scope > .reveal, .hero__copy > .reveal")];
+
+  animate(heroItems, {
+    opacity: [0, 1],
+    y: [34, 0],
+  }, {
+    duration: 0.9,
+    delay: stagger(0.1, { startDelay: 0.12 }),
+    ease: entranceEase,
+  });
+
+  animate(".hero__credentials > div", {
+    opacity: [0, 1],
+    y: [22, 0],
+  }, {
+    duration: 0.72,
+    delay: stagger(0.09, { startDelay: 0.66 }),
+    ease: entranceEase,
+  });
+
+  hero.querySelectorAll("[data-counter]").forEach(animateCounter);
+
+  document.querySelectorAll(".reveal").forEach((element) => {
+    if (element.closest(".hero")) return;
+    inView(element, (target) => {
+      const isParallaxTarget = target.matches(".evidence__intro, .deer-field, .coverage__visual");
+      animate(target, isParallaxTarget ? {
+        opacity: [0, 1],
+      } : {
+        opacity: [0, 1],
+        y: [42, 0],
+      }, {
+        duration: 0.88,
+        ease: entranceEase,
+      });
+      target.querySelectorAll?.("[data-counter]").forEach(animateCounter);
+    }, { amount: 0.14, margin: "0px 0px -8% 0px" });
+  });
+
+  inView("[data-counter]", (element) => animateCounter(element), { amount: 0.4 });
+
+  [
+    [".stat-ribbon", ".stat-ribbon article"],
+    [".flight__stats", ".flight__stats article"],
+    [".deliverables__grid", ".deliverables__grid article"],
+  ].forEach(([containerSelector, itemSelector]) => {
+    const container = document.querySelector(containerSelector);
+    const items = [...document.querySelectorAll(itemSelector)];
+    if (!container || !items.length) return;
+    inView(container, () => {
+      animate(items, {
+        opacity: [0, 1],
+        y: [28, 0],
+      }, {
+        duration: 0.72,
+        delay: stagger(0.1),
+        ease: entranceEase,
+      });
+    }, { amount: 0.2 });
+  });
+
+  inView(".coverage__visual", () => {
+    animate(".coverage__rings span", {
+      opacity: [0, 1],
+      scale: [0.72, 1],
+    }, {
+      duration: 0.85,
+      delay: stagger(0.08, { from: "center" }),
+      ease: entranceEase,
+    });
+  }, { amount: 0.3 });
+
+  const linkToScroll = (element, keyframes, target, offset = ["start start", "end start"]) => {
+    if (!element || !target) return;
+    scroll(animate(element, keyframes, { ease: "linear" }), { target, offset });
+  };
+
+  linkToScroll(document.querySelector(".hero__title-line--primary"), { x: [0, -72], opacity: [1, 0.12] }, hero);
+  linkToScroll(document.querySelector(".hero__title-line--accent"), { x: [0, 64], opacity: [1, 0.12] }, hero);
+  linkToScroll(document.querySelector(".hero__copy"), { y: [0, -64], opacity: [1, 0.14], scale: [1, 0.975] }, hero);
+  linkToScroll(document.querySelector(".hero__proof-value"), { y: [0, -46], opacity: [1, 0.08], scale: [1, 0.9] }, hero);
+  linkToScroll(document.querySelector(".hero__scroll"), { opacity: [1, 0], scale: [1, 0.92] }, hero, ["start start", "45% start"]);
+
+  linkToScroll(document.querySelector(".map-story__sticky"), { y: [32, -34] }, mapStory, ["start end", "end start"]);
+  linkToScroll(document.querySelector(".evidence__intro"), { y: [54, -32] }, evidence, ["start end", "end start"]);
+  linkToScroll(document.querySelector(".deer-field"), { y: [40, -24], scale: [0.96, 1.015] }, evidence, ["start end", "end start"]);
+  linkToScroll(document.querySelector(".coverage__visual"), { y: [68, -40], rotate: [-1.5, 1.5] }, coverage, ["start end", "end start"]);
+  linkToScroll(document.querySelector(".closing__glow"), { scale: [0.72, 1.18], opacity: [0.2, 1] }, closing, ["start end", "center center"]);
+}
+
+setupMotionAnimations();
 
 let scrollTicking = false;
 function updateScrollStory() {
