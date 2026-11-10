@@ -951,5 +951,378 @@ function requestScrollUpdate() {
 
 window.addEventListener("scroll", requestScrollUpdate, { passive: true });
 window.addEventListener("resize", requestScrollUpdate, { passive: true });
+
+function setupStudyForm() {
+  const modal = document.getElementById("study-modal");
+  const openButton = document.getElementById("open-study-form");
+  const form = document.getElementById("study-form");
+  if (!modal || !openButton || !form) return;
+
+  const closeButtons = modal.querySelectorAll(".study-form__close, [data-close-study-form]");
+  const backButton = document.getElementById("study-back");
+  const nextButton = document.getElementById("study-next");
+  const submitButton = document.getElementById("study-submit");
+  const formBody = modal.querySelector(".study-form__body");
+  const intro = modal.querySelector(".study-form__intro");
+  const footer = modal.querySelector(".study-form__footer");
+  const progress = modal.querySelector(".study-form__progress");
+  const progressSteps = [...modal.querySelectorAll("[data-progress-step]")];
+  const steps = [...modal.querySelectorAll("[data-step]")];
+  const stepDescription = document.getElementById("study-step-description");
+  const message = document.getElementById("study-form-message");
+  const success = document.getElementById("study-form-success");
+  const successName = document.getElementById("study-success-name");
+  const locationInput = document.getElementById("study-location");
+  const suggestionsList = document.getElementById("address-suggestions");
+  const addressField = locationInput.closest(".address-field");
+  const descriptions = {
+    1: "Start with the best way for our aerial intelligence team to reach you.",
+    2: "Share the study type, location, scale, and an optional working budget.",
+    3: "Review every detail below. You can edit any field before submitting.",
+  };
+  let currentStep = 1;
+  let addressTimer = 0;
+  let addressController = null;
+  let addressResults = [];
+  let activeSuggestion = -1;
+
+  function clearFieldError(control) {
+    const field = control.closest(".form-field");
+    if (!field) return;
+    field.classList.remove("has-error");
+    field.querySelectorAll("input, select").forEach((input) => input.removeAttribute("aria-invalid"));
+    const error = field.querySelector(".form-field__error");
+    if (error) error.textContent = "";
+  }
+
+  function errorFor(control) {
+    if (control.type === "radio") {
+      const group = control.closest("fieldset")?.querySelectorAll('input[type="radio"]');
+      return group && ![...group].some((radio) => radio.checked) ? "Choose a study type." : "";
+    }
+
+    const value = control.value.trim();
+    if (control.required && !value) return "This field is required.";
+    if (!value) return "";
+
+    if (control.type === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(value)) {
+      return "Enter a valid email address.";
+    }
+    if (control.type === "tel") {
+      const digits = value.replace(/\D/g, "");
+      if (digits.length < 7 || digits.length > 15) return "Enter a valid phone number.";
+    }
+    if (control.type === "number" && Number(value) < Number(control.min || 0)) {
+      return Number(control.min) > 0 ? "Enter an area greater than zero." : "Enter a positive amount.";
+    }
+    if ((control.id === "study-full-name" || control.id === "review-full-name") && value.length < 2) {
+      return "Enter your full name.";
+    }
+    if ((control.id === "study-location" || control.id === "review-location") && value.length < 5) {
+      return "Enter a complete study location.";
+    }
+    return "";
+  }
+
+  function showFieldError(control, errorText) {
+    const field = control.closest(".form-field");
+    if (!field) return;
+    field.classList.toggle("has-error", Boolean(errorText));
+    const relatedControls = control.type === "radio"
+      ? field.querySelectorAll('input[type="radio"]')
+      : [control];
+    relatedControls.forEach((input) => {
+      if (errorText) input.setAttribute("aria-invalid", "true");
+      else input.removeAttribute("aria-invalid");
+    });
+    const error = field.querySelector(".form-field__error");
+    if (error) error.textContent = errorText;
+  }
+
+  function validateContainer(container) {
+    const controls = [...container.querySelectorAll("input, select")].filter((control) => !control.disabled);
+    const validatedRadioGroups = new Set();
+    let firstInvalid = null;
+
+    controls.forEach((control) => {
+      if (control.type === "radio") {
+        const groupName = control.name || control.dataset.reviewField;
+        if (validatedRadioGroups.has(groupName)) return;
+        validatedRadioGroups.add(groupName);
+      }
+      const errorText = errorFor(control);
+      showFieldError(control, errorText);
+      if (errorText && !firstInvalid) firstInvalid = control;
+    });
+
+    if (firstInvalid) {
+      firstInvalid.focus();
+      message.textContent = "Please check the highlighted information before continuing.";
+      message.hidden = false;
+      return false;
+    }
+    message.hidden = true;
+    return true;
+  }
+
+  function originalControl(name) {
+    return form.elements.namedItem(name);
+  }
+
+  function syncReviewFromForm() {
+    ["fullName", "email", "phone", "location", "studyArea", "studyUnit", "budget"].forEach((name) => {
+      const source = originalControl(name);
+      const review = form.querySelector(`[data-review-field="${name}"]`);
+      if (source && review) review.value = source.value;
+    });
+    const studyType = form.querySelector('input[name="studyType"]:checked')?.value;
+    form.querySelectorAll('[data-review-field="studyType"]').forEach((radio) => {
+      radio.checked = radio.value === studyType;
+    });
+  }
+
+  function syncFormFromReview() {
+    ["fullName", "email", "phone", "location", "studyArea", "studyUnit", "budget"].forEach((name) => {
+      const target = originalControl(name);
+      const review = form.querySelector(`[data-review-field="${name}"]`);
+      if (target && review) target.value = review.value;
+    });
+    const studyType = form.querySelector('[data-review-field="studyType"]:checked')?.value;
+    form.querySelectorAll('input[name="studyType"]').forEach((radio) => {
+      radio.checked = radio.value === studyType;
+    });
+  }
+
+  function setStep(step) {
+    currentStep = step;
+    steps.forEach((section) => {
+      const isActive = Number(section.dataset.step) === currentStep;
+      section.hidden = !isActive;
+      section.classList.toggle("is-active", isActive);
+    });
+    progressSteps.forEach((item) => {
+      const itemStep = Number(item.dataset.progressStep);
+      item.classList.toggle("is-active", itemStep === currentStep);
+      item.classList.toggle("is-complete", itemStep < currentStep);
+    });
+    stepDescription.textContent = descriptions[currentStep];
+    backButton.hidden = currentStep === 1;
+    nextButton.hidden = currentStep === 3;
+    submitButton.hidden = currentStep !== 3;
+    message.hidden = true;
+    formBody.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+    const activeStep = steps.find((section) => Number(section.dataset.step) === currentStep);
+    window.setTimeout(() => activeStep?.querySelector("input, select")?.focus(), reducedMotion ? 0 : 170);
+  }
+
+  function resetModalView() {
+    success.hidden = true;
+    intro.hidden = false;
+    footer.hidden = false;
+    progress.hidden = false;
+    setStep(1);
+  }
+
+  function openModal() {
+    resetModalView();
+    document.body.classList.add("modal-open");
+    modal.showModal();
+    window.setTimeout(() => document.getElementById("study-full-name")?.focus(), reducedMotion ? 0 : 220);
+  }
+
+  function closeModal() {
+    closeSuggestions();
+    addressController?.abort();
+    if (modal.open) modal.close();
+    document.body.classList.remove("modal-open");
+    openButton.focus();
+  }
+
+  function formatAddress(feature) {
+    const properties = feature.properties || {};
+    const street = properties.street || properties.name || "";
+    const primary = [properties.housenumber, street].filter(Boolean).join(" ");
+    const city = properties.city || properties.town || properties.village || properties.district || properties.county || "";
+    const secondary = [city, properties.state, properties.postcode].filter(Boolean).join(", ");
+    const country = properties.country && properties.countrycode?.toLowerCase() !== "us" ? properties.country : "";
+    const full = [primary, secondary, country].filter(Boolean).join(", ");
+    return { primary: primary || city || properties.name || "Address", secondary, full };
+  }
+
+  function closeSuggestions() {
+    suggestionsList.hidden = true;
+    suggestionsList.innerHTML = "";
+    locationInput.setAttribute("aria-expanded", "false");
+    locationInput.removeAttribute("aria-activedescendant");
+    addressResults = [];
+    activeSuggestion = -1;
+  }
+
+  function selectSuggestion(index) {
+    const result = addressResults[index];
+    if (!result) return;
+    locationInput.value = result.full;
+    clearFieldError(locationInput);
+    closeSuggestions();
+    locationInput.focus();
+  }
+
+  function setActiveSuggestion(index) {
+    if (!addressResults.length) return;
+    activeSuggestion = (index + addressResults.length) % addressResults.length;
+    const buttons = suggestionsList.querySelectorAll("button");
+    buttons.forEach((button, buttonIndex) => button.classList.toggle("is-active", buttonIndex === activeSuggestion));
+    const activeButton = buttons[activeSuggestion];
+    if (activeButton) {
+      locationInput.setAttribute("aria-activedescendant", activeButton.id);
+      activeButton.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function renderSuggestions(features) {
+    const unique = new Set();
+    addressResults = features
+      .map(formatAddress)
+      .filter((result) => result.full && !unique.has(result.full) && unique.add(result.full))
+      .slice(0, 5);
+    suggestionsList.innerHTML = "";
+
+    addressResults.forEach((result, index) => {
+      const item = document.createElement("li");
+      item.setAttribute("role", "option");
+      const button = document.createElement("button");
+      button.type = "button";
+      button.id = `address-suggestion-${index}`;
+      button.innerHTML = `<strong></strong><span></span>`;
+      button.querySelector("strong").textContent = result.primary;
+      button.querySelector("span").textContent = result.secondary || result.full;
+      button.addEventListener("mousedown", (event) => event.preventDefault());
+      button.addEventListener("click", () => selectSuggestion(index));
+      item.appendChild(button);
+      suggestionsList.appendChild(item);
+    });
+
+    suggestionsList.hidden = !addressResults.length;
+    locationInput.setAttribute("aria-expanded", String(Boolean(addressResults.length)));
+    activeSuggestion = -1;
+  }
+
+  async function fetchAddressSuggestions(query) {
+    addressController?.abort();
+    addressController = new AbortController();
+    addressField.classList.add("is-loading");
+    try {
+      const params = new URLSearchParams({ q: query, limit: "5", lang: "en" });
+      const response = await fetch(`https://photon.komoot.io/api/?${params}`, {
+        signal: addressController.signal,
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error("Address lookup failed");
+      const data = await response.json();
+      if (locationInput.value.trim() === query) renderSuggestions(data.features || []);
+    } catch (error) {
+      if (error.name !== "AbortError") closeSuggestions();
+    } finally {
+      addressField.classList.remove("is-loading");
+    }
+  }
+
+  openButton.addEventListener("click", openModal);
+  closeButtons.forEach((button) => button.addEventListener("click", closeModal));
+  modal.addEventListener("close", () => {
+    document.body.classList.remove("modal-open");
+    if (!success.hidden) {
+      form.reset();
+      form.querySelectorAll(".form-field").forEach((field) => field.classList.remove("has-error"));
+      form.querySelectorAll('[aria-invalid="true"]').forEach((control) => control.removeAttribute("aria-invalid"));
+      form.querySelectorAll(".form-field__error").forEach((error) => { error.textContent = ""; });
+    }
+  });
+  modal.addEventListener("cancel", () => {
+    document.body.classList.remove("modal-open");
+    openButton.focus();
+  });
+  modal.addEventListener("click", (event) => {
+    const bounds = modal.getBoundingClientRect();
+    const inside = event.clientX >= bounds.left && event.clientX <= bounds.right
+      && event.clientY >= bounds.top && event.clientY <= bounds.bottom;
+    if (!inside) closeModal();
+  });
+
+  nextButton.addEventListener("click", () => {
+    const activeStep = steps.find((section) => Number(section.dataset.step) === currentStep);
+    if (!activeStep || !validateContainer(activeStep)) return;
+    if (currentStep === 2) syncReviewFromForm();
+    setStep(Math.min(3, currentStep + 1));
+  });
+
+  backButton.addEventListener("click", () => {
+    if (currentStep === 3) syncFormFromReview();
+    setStep(Math.max(1, currentStep - 1));
+  });
+
+  form.addEventListener("input", (event) => clearFieldError(event.target));
+  form.addEventListener("change", (event) => clearFieldError(event.target));
+
+  locationInput.addEventListener("input", () => {
+    window.clearTimeout(addressTimer);
+    const query = locationInput.value.trim();
+    if (query.length < 3) {
+      addressController?.abort();
+      closeSuggestions();
+      return;
+    }
+    addressTimer = window.setTimeout(() => fetchAddressSuggestions(query), 360);
+  });
+
+  locationInput.addEventListener("keydown", (event) => {
+    if (suggestionsList.hidden || !addressResults.length) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveSuggestion(activeSuggestion + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveSuggestion(activeSuggestion - 1);
+    } else if (event.key === "Enter" && activeSuggestion >= 0) {
+      event.preventDefault();
+      selectSuggestion(activeSuggestion);
+    } else if (event.key === "Escape") {
+      closeSuggestions();
+    }
+  });
+
+  locationInput.addEventListener("blur", () => window.setTimeout(closeSuggestions, 120));
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const reviewStep = steps.find((section) => Number(section.dataset.step) === 3);
+    if (!reviewStep || !validateContainer(reviewStep)) return;
+    syncFormFromReview();
+
+    const detail = {
+      fullName: originalControl("fullName").value.trim(),
+      email: originalControl("email").value.trim(),
+      phone: originalControl("phone").value.trim(),
+      studyType: form.querySelector('input[name="studyType"]:checked')?.value || "",
+      location: originalControl("location").value.trim(),
+      studyArea: Number(originalControl("studyArea").value),
+      studyUnit: originalControl("studyUnit").value,
+      budget: originalControl("budget").value ? Number(originalControl("budget").value) : null,
+    };
+    form.dispatchEvent(new CustomEvent("study-request-submit", { bubbles: true, detail }));
+
+    steps.forEach((step) => { step.hidden = true; });
+    intro.hidden = true;
+    footer.hidden = true;
+    progress.hidden = true;
+    message.hidden = true;
+    successName.textContent = detail.fullName.split(/\s+/)[0] || "we’ll be in touch";
+    success.hidden = false;
+    formBody.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+    success.querySelector("button")?.focus();
+  });
+}
+
+setupStudyForm();
 document.getElementById("year").textContent = new Date().getFullYear();
 updateScrollStory();

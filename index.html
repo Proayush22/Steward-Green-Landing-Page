@@ -235,11 +235,180 @@
           Bring defensible wildlife data into planning, policy, habitat restoration, and long-term stewardship.
         </p>
         <div class="closing__actions reveal">
-          <a class="button button--primary" href="https://www.stewardgreen.com/contact">Plan a deer density study</a>
+          <button class="button button--primary" id="open-study-form" type="button">Plan a deer density study</button>
           <a class="text-link" href="https://www.stewardgreen.com/stewardair">Explore StewardAir <span aria-hidden="true">&nearr;</span></a>
         </div>
       </section>
     </main>
+
+    <dialog class="study-modal" id="study-modal" aria-labelledby="study-form-title">
+      <form class="study-form" id="study-form" novalidate>
+        <div class="study-form__topbar">
+          <a class="study-form__brand" href="#top" aria-label="StewardAir home">
+            <img src="./stewardair-logo.png" alt="StewardAir" width="772" height="350" />
+          </a>
+          <button class="study-form__close" type="button" aria-label="Close study form">
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+          </button>
+        </div>
+
+        <div class="study-form__progress" aria-label="Form progress">
+          <span class="is-active" data-progress-step="1"><i>01</i> Contact</span>
+          <span data-progress-step="2"><i>02</i> Study</span>
+          <span data-progress-step="3"><i>03</i> Review</span>
+        </div>
+
+        <div class="study-form__body">
+          <div class="study-form__intro">
+            <p class="study-form__eyebrow">Plan a density study</p>
+            <h2 id="study-form-title">Tell us about <em>your project.</em></h2>
+            <p id="study-step-description">Start with the best way for our aerial intelligence team to reach you.</p>
+          </div>
+
+          <div class="study-form__message" id="study-form-message" role="alert" hidden></div>
+
+          <section class="study-form__step is-active" data-step="1" aria-label="Contact details">
+            <div class="form-field form-field--full">
+              <label for="study-full-name">Full name <span aria-hidden="true">*</span></label>
+              <input id="study-full-name" name="fullName" type="text" autocomplete="name" minlength="2" required />
+              <small class="form-field__error"></small>
+            </div>
+            <div class="form-field">
+              <label for="study-email">Email <span aria-hidden="true">*</span></label>
+              <input id="study-email" name="email" type="email" autocomplete="email" required />
+              <small class="form-field__error"></small>
+            </div>
+            <div class="form-field">
+              <label for="study-phone">Phone number <span aria-hidden="true">*</span></label>
+              <input id="study-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="(555) 555-0123" required />
+              <small class="form-field__error"></small>
+            </div>
+          </section>
+
+          <section class="study-form__step" data-step="2" aria-label="Study details" hidden>
+            <fieldset class="form-field form-field--full form-field--choice">
+              <legend>Do you have a private or government study? <span aria-hidden="true">*</span></legend>
+              <div class="choice-group">
+                <label><input type="radio" name="studyType" value="Private" required /><span>Private</span></label>
+                <label><input type="radio" name="studyType" value="Government" required /><span>Government</span></label>
+              </div>
+              <small class="form-field__error"></small>
+            </fieldset>
+
+            <div class="form-field form-field--full address-field">
+              <label for="study-location">Location of study <span aria-hidden="true">*</span></label>
+              <div class="address-field__control">
+                <input id="study-location" name="location" type="text" autocomplete="street-address" placeholder="Start typing an address" aria-autocomplete="list" aria-controls="address-suggestions" aria-expanded="false" required />
+                <span class="address-field__loader" aria-hidden="true"></span>
+              </div>
+              <ul class="address-suggestions" id="address-suggestions" role="listbox" hidden></ul>
+              <small class="form-field__hint">Suggestions include the city, state, and ZIP code. Data &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap contributors</a>.</small>
+              <small class="form-field__error"></small>
+            </div>
+
+            <div class="form-field form-field--full">
+              <label for="study-area">Area being studied <span aria-hidden="true">*</span></label>
+              <div class="measurement-field">
+                <input id="study-area" name="studyArea" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0" required />
+                <select id="study-unit" name="studyUnit" aria-label="Area unit" required>
+                  <option value="Acres">Acres</option>
+                  <option value="Square miles">Square miles</option>
+                </select>
+              </div>
+              <small class="form-field__error"></small>
+            </div>
+
+            <div class="form-field form-field--full">
+              <label for="study-budget">What is your budget? <span class="optional-label">Optional</span></label>
+              <div class="currency-field">
+                <span aria-hidden="true">$</span>
+                <input id="study-budget" name="budget" type="number" inputmode="decimal" min="0" step="100" placeholder="0" />
+              </div>
+              <small class="form-field__error"></small>
+            </div>
+          </section>
+
+          <section class="study-form__step study-form__review" data-step="3" aria-label="Review study request" hidden>
+            <div class="review-section">
+              <div class="review-section__heading"><span>01</span><h3>Contact details</h3></div>
+              <div class="review-section__fields">
+                <div class="form-field form-field--full">
+                  <label for="review-full-name">Full name <span aria-hidden="true">*</span></label>
+                  <input id="review-full-name" data-review-field="fullName" type="text" autocomplete="name" minlength="2" required />
+                  <small class="form-field__error"></small>
+                </div>
+                <div class="form-field">
+                  <label for="review-email">Email <span aria-hidden="true">*</span></label>
+                  <input id="review-email" data-review-field="email" type="email" autocomplete="email" required />
+                  <small class="form-field__error"></small>
+                </div>
+                <div class="form-field">
+                  <label for="review-phone">Phone number <span aria-hidden="true">*</span></label>
+                  <input id="review-phone" data-review-field="phone" type="tel" autocomplete="tel" inputmode="tel" required />
+                  <small class="form-field__error"></small>
+                </div>
+              </div>
+            </div>
+
+            <div class="review-section">
+              <div class="review-section__heading"><span>02</span><h3>Study details</h3></div>
+              <div class="review-section__fields">
+                <fieldset class="form-field form-field--full form-field--choice">
+                  <legend>Study type <span aria-hidden="true">*</span></legend>
+                  <div class="choice-group">
+                    <label><input type="radio" data-review-field="studyType" name="reviewStudyType" value="Private" required /><span>Private</span></label>
+                    <label><input type="radio" data-review-field="studyType" name="reviewStudyType" value="Government" required /><span>Government</span></label>
+                  </div>
+                  <small class="form-field__error"></small>
+                </fieldset>
+                <div class="form-field form-field--full">
+                  <label for="review-location">Location of study <span aria-hidden="true">*</span></label>
+                  <input id="review-location" data-review-field="location" type="text" required />
+                  <small class="form-field__error"></small>
+                </div>
+                <div class="form-field form-field--full">
+                  <label for="review-area">Area being studied <span aria-hidden="true">*</span></label>
+                  <div class="measurement-field">
+                    <input id="review-area" data-review-field="studyArea" type="number" inputmode="decimal" min="0.01" step="0.01" required />
+                    <select id="review-unit" data-review-field="studyUnit" aria-label="Area unit" required>
+                      <option value="Acres">Acres</option>
+                      <option value="Square miles">Square miles</option>
+                    </select>
+                  </div>
+                  <small class="form-field__error"></small>
+                </div>
+                <div class="form-field form-field--full">
+                  <label for="review-budget">What is your budget? <span class="optional-label">Optional</span></label>
+                  <div class="currency-field">
+                    <span aria-hidden="true">$</span>
+                    <input id="review-budget" data-review-field="budget" type="number" inputmode="decimal" min="0" step="100" placeholder="Not provided" />
+                  </div>
+                  <small class="form-field__error"></small>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="study-form__success" id="study-form-success" aria-live="polite" hidden>
+            <span class="study-form__success-mark" aria-hidden="true">&#10003;</span>
+            <p class="study-form__eyebrow">Request complete</p>
+            <h2>Thank you, <em id="study-success-name">your request is ready.</em></h2>
+            <p>Your project details have passed validation and are ready for StewardAir’s submission workflow.</p>
+            <button class="button button--primary" type="button" data-close-study-form>Done</button>
+          </section>
+        </div>
+
+        <div class="study-form__footer">
+          <p><span aria-hidden="true">*</span> Required information</p>
+          <div class="study-form__actions">
+            <button class="button button--quiet" id="study-back" type="button" hidden>Back</button>
+            <button class="button button--primary" id="study-next" type="button">Next <span aria-hidden="true">&rarr;</span></button>
+            <button class="button button--primary" id="study-submit" type="submit" hidden>Submit study request <span aria-hidden="true">&rarr;</span></button>
+          </div>
+        </div>
+      </form>
+    </dialog>
 
     <footer class="site-footer">
       <a class="wordmark wordmark--footer" href="#top">
