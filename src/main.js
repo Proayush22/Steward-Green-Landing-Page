@@ -274,6 +274,67 @@ function createMapScene() {
   // Use the actual study-state polygons to seed the deer markers; every marker is
   // sampled inside a state boundary instead of being scattered over a rectangle.
   const studyFeatures = states.filter((stateFeature) => targetIndex.has(normalizeFips(stateFeature.id)));
+  const coveragePingCount = 16;
+  const coverageAreaPerPing = 772 / coveragePingCount;
+  const coverageRadius = Math.sqrt(coverageAreaPerPing / Math.PI) * (projection.scale() / 3958.7613);
+  const coverageRippleDisplayScale = 2; // Make individual pings readable at the national map scale.
+  const coverageRingCanvas = document.createElement("canvas");
+  coverageRingCanvas.width = 128;
+  coverageRingCanvas.height = 128;
+  const coverageRingContext = coverageRingCanvas.getContext("2d");
+  coverageRingContext.strokeStyle = "#ffffff";
+  coverageRingContext.lineWidth = 4;
+  coverageRingContext.shadowColor = "#ffffff";
+  coverageRingContext.shadowBlur = 4;
+  coverageRingContext.beginPath();
+  coverageRingContext.arc(64, 64, 52, 0, Math.PI * 2);
+  coverageRingContext.stroke();
+  const coverageRingTexture = new THREE.CanvasTexture(coverageRingCanvas);
+  coverageRingTexture.colorSpace = THREE.SRGBColorSpace;
+  const coveragePings = [];
+  const coverageFeatureByFips = new Map(studyFeatures.map((stateFeature) => [normalizeFips(stateFeature.id), stateFeature]));
+  const seededCoverageRandom = (index, attempt, offset) => {
+    const value = Math.sin((index + 1) * 12.9898 + (attempt + 1) * 78.233 + offset * 37.719) * 43758.5453;
+    return value - Math.floor(value);
+  };
+
+  targetStates.forEach((state, stateIndex) => {
+    const stateFeature = coverageFeatureByFips.get(state.fips);
+    if (!stateFeature) return;
+    const [[minLon, minLat], [maxLon, maxLat]] = geoBounds(stateFeature);
+    let coordinate = geoCentroid(stateFeature);
+    if (!geoContains(stateFeature, coordinate)) {
+      for (let attempt = 0; attempt < 1000; attempt += 1) {
+        const candidate = [
+          minLon + seededCoverageRandom(stateIndex, attempt, 0) * (maxLon - minLon),
+          minLat + seededCoverageRandom(stateIndex, attempt, 1) * (maxLat - minLat),
+        ];
+        if (geoContains(stateFeature, candidate)) {
+          coordinate = candidate;
+          break;
+        }
+      }
+    }
+    const point = projection(coordinate);
+    if (!point) return;
+    const rings = Array.from({ length: 1 }, () => {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: coverageRingTexture,
+        color: 0xf07865,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }));
+      sprite.position.set(point[0], -point[1], 0.25 + stateIndex * 0.0002);
+      const ringBaseScale = (coverageRadius * 2 * coverageRippleDisplayScale) / (104 / 128);
+      sprite.scale.setScalar(ringBaseScale * 0.4);
+      mapGroup.add(sprite);
+      return { sprite, ringBaseScale };
+    });
+    coveragePings.push({ rings, visibility: 0, stateFips: state.fips });
+  });
+
   const deerIconCanvas = document.createElement("canvas");
   deerIconCanvas.width = 128;
   deerIconCanvas.height = 128;
@@ -567,6 +628,17 @@ function createMapScene() {
     flightDrone.userData.targetOpacity = visible;
   }
 
+  function setCoverageProgress(progress = 0, visibility = 0) {
+    const amount = clamp(progress);
+    const visible = clamp(visibility);
+    const activePings = amount * coveragePings.length;
+    coveragePings.forEach((ping, index) => {
+      ping.visibility = clamp(activePings - index) * visible;
+    });
+    const countLabel = document.getElementById("coverage-ping-count");
+    if (countLabel) countLabel.textContent = String(Math.round(activePings));
+  }
+
   function resize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -616,6 +688,18 @@ function createMapScene() {
     mapGroup.scale.setScalar(mapState.view.currentScale);
     densityHeat.material.opacity += ((densityHeatActive ? 0.46 : 0) - densityHeat.material.opacity) * 0.14;
     flightDrone.material.opacity += ((flightDrone.userData.targetOpacity ?? 0) - flightDrone.material.opacity) * 0.16;
+    coveragePings.forEach(({ rings, visibility }, pingIndex) => {
+      rings.forEach(({ sprite, ringBaseScale }) => {
+        const phase = reducedMotion ? 0.5 : (seconds * 0.18 + pingIndex * 0.13) % 1;
+        const expansion = reducedMotion ? 1 : 0.4 + phase * 8.8;
+        const pulse = reducedMotion ? 0.3 : Math.pow(Math.sin(Math.PI * phase), 0.72) * 0.8;
+        const targetOpacity = visibility * pulse;
+        const targetScale = ringBaseScale * expansion;
+        sprite.material.opacity += (targetOpacity - sprite.material.opacity) * 0.22;
+        sprite.scale.x += (targetScale - sprite.scale.x) * 0.22;
+        sprite.scale.y += (targetScale - sprite.scale.y) * 0.22;
+      });
+    });
     densityDeer.forEach(({ sprite, x, y, size }) => {
       const distance = Math.hypot(x - (densityHeat.userData.targetX ?? 100), y - (densityHeat.userData.targetY ?? 100));
       const isHovered = densityHeatActive && distance < Math.max(0.09, size * 0.95);
@@ -634,7 +718,7 @@ function createMapScene() {
   window.addEventListener("resize", resize, { passive: true });
   requestAnimationFrame(render);
 
-  return { mapGroup, mount, setStoryView, setDensityView, setDensityPointer, setTargetDotVisibility, setFlightProgress, setFlightTheme };
+  return { mapGroup, mount, setStoryView, setDensityView, setDensityPointer, setTargetDotVisibility, setFlightProgress, setFlightTheme, setCoverageProgress };
 }
 
 function setMapProgress(progress, engagement, setStoryView) {
@@ -785,13 +869,15 @@ function animateCounter(element) {
   });
 }
 
-const { mount: mapMount, setStoryView, setDensityView, setDensityPointer, setTargetDotVisibility, setFlightProgress, setFlightTheme } = createMapScene();
+const { mount: mapMount, setStoryView, setDensityView, setDensityPointer, setTargetDotVisibility, setFlightProgress, setFlightTheme, setCoverageProgress } = createMapScene();
 const deerField = createDeerField(setDensityPointer);
 const hero = document.getElementById("top");
 const mapStory = document.getElementById("reach");
 const evidence = document.getElementById("evidence");
 const flight = document.getElementById("flight");
+const flightSticky = flight.querySelector(".flight__sticky");
 const coverage = document.getElementById("coverage");
+const coverageSticky = coverage.querySelector(".coverage__sticky");
 const closing = document.querySelector(".closing");
 const siteHeader = document.getElementById("site-header");
 
@@ -889,7 +975,6 @@ function setupMotionAnimations() {
   linkToScroll(document.querySelector(".map-story__sticky"), { y: [32, -34] }, mapStory, ["start end", "end start"]);
   linkToScroll(document.querySelector(".evidence__intro"), { y: [54, -32] }, evidence, ["start end", "end start"]);
   linkToScroll(document.querySelector(".deer-field"), { y: [40, -24], scale: [0.96, 1.015] }, evidence, ["start end", "end start"]);
-  linkToScroll(document.querySelector(".coverage__visual"), { y: [68, -40], rotate: [-1.5, 1.5] }, coverage, ["start end", "end start"]);
   linkToScroll(document.querySelector(".closing__glow"), { scale: [0.72, 1.18], opacity: [0.2, 1] }, closing, ["start end", "center center"]);
 }
 
@@ -919,27 +1004,40 @@ function updateScrollStory() {
 
   const flightRect = flight.getBoundingClientRect();
   const flightTriggerY = viewportHeight * 0.55;
-  const flightProgress = clamp((flightTriggerY - flightRect.top) / Math.max(1, flightRect.height * 0.85));
-  const flightViewIn = clamp((viewportHeight * 0.82 - flightRect.top) / Math.max(1, flightRect.height * 0.2));
-  const flightViewOut = clamp((flightRect.bottom - viewportHeight * 0.38) / Math.max(1, flightRect.height * 0.2));
+  const flightStickyStyle = window.getComputedStyle(flightSticky);
+  const flightStickyTop = Number.parseFloat(flightStickyStyle.top) || Math.max(112, viewportHeight * 0.1);
+  const flightStickyHeight = flightSticky.getBoundingClientRect().height;
+  const flightScrollRange = Math.max(1, flightRect.height - flightStickyHeight);
+  const flightProgress = clamp((flightStickyTop - flightRect.top) / flightScrollRange);
+  const flightViewIn = clamp((viewportHeight * 0.82 - flightRect.top) / (viewportHeight * 0.24));
+  const flightStickyBottom = flightStickyTop + flightStickyHeight;
+  const flightViewOut = clamp((flightRect.bottom - flightStickyBottom) / (viewportHeight * 0.16));
   const flightViewProgress = Math.min(flightViewIn, flightViewOut);
-  const flightAnimationIn = clamp((flightTriggerY - flightRect.top) / Math.max(1, viewportHeight * 0.12));
-  const flightAnimationOut = clamp((flightRect.bottom - viewportHeight * 0.12) / Math.max(1, viewportHeight * 0.14));
+  const deerFadeProgress = clamp((flightTriggerY - flightRect.top) / Math.max(1, viewportHeight * 0.12));
+  const flightAnimationIn = clamp((flightStickyTop - flightRect.top) / Math.max(1, viewportHeight * 0.025));
+  const flightAnimationOut = clamp((flightRect.bottom - flightStickyBottom) / Math.max(1, viewportHeight * 0.025));
   const flightAnimationVisibility = Math.min(flightAnimationIn, flightAnimationOut);
-  const deerVisibility = 1 - flightAnimationIn;
+  const deerVisibility = 1 - deerFadeProgress;
   const densitySectionProgress = Math.min(densityIn, densityOut);
   const densityViewProgress = Math.max(densitySectionProgress, flightViewProgress);
   setDensityView(densityViewProgress, deerVisibility, flightViewProgress);
   setFlightProgress(reducedMotion ? 1 : flightProgress, reducedMotion ? flightViewProgress : flightAnimationVisibility);
   setFlightTheme(flightViewProgress);
   const coverageRect = coverage.getBoundingClientRect();
-  const coverageDotsIn = clamp((viewportHeight * 0.82 - coverageRect.top) / Math.max(1, coverageRect.height * 0.2));
-  const coverageDotsOut = clamp((coverageRect.bottom - viewportHeight * 0.38) / Math.max(1, coverageRect.height * 0.2));
-  const coverageDotsProgress = Math.min(coverageDotsIn, coverageDotsOut);
-  setTargetDotVisibility(Math.max(densityViewProgress, coverageDotsProgress));
+  const coverageStickyStyle = window.getComputedStyle(coverageSticky);
+  const coverageStickyTop = Number.parseFloat(coverageStickyStyle.top) || Math.max(112, viewportHeight * 0.1);
+  const coverageStickyHeight = coverageSticky.getBoundingClientRect().height;
+  const coverageScrollRange = Math.max(1, coverageRect.height - coverageStickyHeight);
+  const coverageProgress = clamp((coverageStickyTop - coverageRect.top) / coverageScrollRange);
+  const coverageStickyBottom = coverageStickyTop + coverageStickyHeight;
+  const coverageViewIn = clamp((viewportHeight * 0.82 - coverageRect.top) / (viewportHeight * 0.24));
+  const coverageViewOut = clamp((coverageRect.bottom - coverageStickyBottom) / (viewportHeight * 0.16));
+  const coverageViewProgress = Math.min(coverageViewIn, coverageViewOut);
+  setCoverageProgress(reducedMotion ? (coverageViewProgress > 0 ? 1 : 0) : coverageProgress, coverageViewProgress);
+  setTargetDotVisibility(Math.max(densityViewProgress, coverageViewProgress));
 
   const pageProgress = window.scrollY / Math.max(1, document.documentElement.scrollHeight - viewportHeight);
-  mapMount.style.opacity = String(Math.max(clamp(1 - pageProgress * 0.8, 0.22, 1), densityViewProgress * 0.95));
+  mapMount.style.opacity = String(Math.max(clamp(1 - pageProgress * 0.8, 0.22, 1), densityViewProgress * 0.95, coverageViewProgress * 0.95));
   siteHeader.classList.toggle("is-scrolled", window.scrollY > 32);
 }
 

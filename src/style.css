@@ -690,8 +690,19 @@ h2 em {
 }
 
 .flight {
-  padding-top: 10rem;
-  padding-bottom: 12rem;
+  position: relative;
+  min-height: 230svh;
+  padding-top: 1px;
+  padding-bottom: 40vh;
+}
+
+.flight__sticky {
+  position: sticky;
+  top: max(7rem, 10vh);
+  display: flex;
+  min-height: calc(100svh - max(7rem, 10vh) - max(2rem, 5vh));
+  flex-direction: column;
+  justify-content: center;
 }
 
 .flight .section-kicker,
@@ -732,7 +743,7 @@ h2 em {
   align-items: center;
   gap: 1rem;
   width: fit-content;
-  margin: 4rem 0 5rem;
+  margin: clamp(1.5rem, 4vh, 4rem) 0 clamp(1.5rem, 5vh, 5rem);
   padding-left: 1.1rem;
   border-left: 1px solid #a8c99b;
 }
@@ -800,13 +811,20 @@ h2 em {
 }
 
 .coverage {
+  position: relative;
+  min-height: 230svh;
+  padding-top: 1px;
+  padding-bottom: 40vh;
+}
+
+.coverage__sticky {
+  position: sticky;
+  top: max(7rem, 10vh);
   display: grid;
   grid-template-columns: 0.9fr 1.1fr;
   align-items: center;
   gap: clamp(3rem, 8vw, 9rem);
-  min-height: 100svh;
-  padding-top: 8rem;
-  padding-bottom: 8rem;
+  min-height: calc(100svh - max(7rem, 10vh) - max(2rem, 5vh));
 }
 
 .coverage__visual {
@@ -859,6 +877,22 @@ h2 em {
   letter-spacing: 0.18em;
   text-align: center;
   text-transform: uppercase;
+}
+
+.coverage__pulse-note {
+  position: relative;
+  z-index: 1;
+  margin-top: clamp(1.2rem, 3vh, 2rem);
+  color: #f07865;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.coverage__pulse-note strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .coverage__copy h2 {
@@ -1170,9 +1204,20 @@ h2 em {
     margin-top: calc(max(7rem, 14vh) - 2vh);
   }
 
+  .flight__sticky {
+    top: max(7rem, 14vh);
+    min-height: calc(100svh - max(7rem, 14vh) - max(2rem, 5vh));
+  }
+
+  .coverage__sticky {
+    top: max(7rem, 14vh);
+    min-height: calc(100svh - max(7rem, 14vh) - max(2rem, 5vh));
+    grid-template-columns: 0.85fr 1.15fr;
+    gap: 2rem;
+  }
+
   .evidence__intro,
   .flight__copy,
-  .coverage,
   .deliverables__heading {
     grid-template-columns: 1fr;
   }
@@ -1183,11 +1228,11 @@ h2 em {
   }
 
   .coverage__visual {
-    min-height: 31rem;
+    min-height: 25rem;
   }
 
   .coverage__copy {
-    padding-top: 2rem;
+    padding-top: 0;
   }
 
   .deliverables__grid {
@@ -1281,10 +1326,14 @@ h2 em {
     font-size: 0.52rem;
   }
 
-  .evidence,
-  .flight {
+  .evidence {
     padding-top: 7rem;
     padding-bottom: 7rem;
+  }
+
+  .flight {
+    min-height: 260svh;
+    padding: 1px var(--page-pad) 32vh;
   }
 
   .deer-field {
@@ -1325,21 +1374,63 @@ h2 em {
   }
 
   .flight-distance-legend {
-    margin: 3rem 0 4rem;
+    margin: 1.2rem 0 1.5rem;
   }
 
   .flight__stats {
-    gap: 2.8rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .flight__stats article:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .flight__stats article {
+    padding-top: 0.75rem;
+  }
+
+  .flight__stats strong {
+    margin-top: 0.8rem;
+    font-size: clamp(1.9rem, 7vw, 2.6rem);
+    letter-spacing: -0.055em;
+  }
+
+  .flight__stats p {
+    margin: 0.45rem 0 0;
+    font-size: 0.72rem;
+    line-height: 1.4;
   }
 
   .coverage {
-    min-height: auto;
-    padding-top: 5rem;
-    padding-bottom: 7rem;
+    min-height: 260svh;
+    padding: 1px var(--page-pad) 32vh;
+  }
+
+  .coverage__sticky {
+    top: max(7rem, 10vh);
+    min-height: calc(100svh - max(7rem, 10vh) - max(2rem, 5vh));
+    grid-template-columns: 1fr;
+    gap: 1rem;
   }
 
   .coverage__visual {
-    min-height: 25rem;
+    min-height: 17rem;
+  }
+
+  .coverage__copy h2 {
+    font-size: clamp(2.2rem, 10vw, 3.1rem);
+  }
+
+  .coverage__lede {
+    margin: 0.8rem 0 1rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .coverage__pulse-note {
+    margin-top: 1rem;
+    font-size: 0.57rem;
   }
 
   .coverage__equation {
