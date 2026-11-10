@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { geoAlbersUsa, geoCentroid } from "d3-geo";
+import { geoAlbersUsa, geoBounds, geoCentroid, geoContains, geoInterpolate } from "d3-geo";
 import { animate, inView, scroll, stagger } from "motion";
 import { feature, neighbors } from "topojson-client";
 import statesTopology from "us-atlas/states-10m.json";
@@ -179,6 +179,35 @@ function createMapScene() {
   mapGroup.rotation.x = -0.08;
   mapGroup.rotation.z = -0.018;
   scene.add(mapGroup);
+  const densityDeer = [];
+  const raycaster = new THREE.Raycaster();
+  const pointerNdc = new THREE.Vector2();
+  const heatPlane = new THREE.Plane();
+  const heatPoint = new THREE.Vector3();
+  let densityHeatActive = false;
+  const heatTextureCanvas = document.createElement("canvas");
+  heatTextureCanvas.width = 128;
+  heatTextureCanvas.height = 128;
+  const heatContext = heatTextureCanvas.getContext("2d");
+  const heatGradient = heatContext.createRadialGradient(64, 64, 0, 64, 64, 64);
+  heatGradient.addColorStop(0, "rgba(255, 100, 72, 0.62)");
+  heatGradient.addColorStop(0.24, "rgba(224, 73, 58, 0.34)");
+  heatGradient.addColorStop(1, "rgba(224, 73, 58, 0)");
+  heatContext.fillStyle = heatGradient;
+  heatContext.fillRect(0, 0, 128, 128);
+  const heatTexture = new THREE.CanvasTexture(heatTextureCanvas);
+  const densityHeat = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: heatTexture,
+    color: 0xff684f,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }));
+  densityHeat.scale.set(0.98, 0.98, 1);
+  densityHeat.position.z = 0.18;
+  mapGroup.add(densityHeat);
+  const stateLayers = [];
 
   const states = feature(statesTopology, statesTopology.objects.states).features;
   const collection = { type: "FeatureCollection", features: states };
@@ -215,6 +244,7 @@ function createMapScene() {
     );
     edges.position.z = 0.012;
     mapGroup.add(edges);
+    stateLayers.push({ fips, isTarget, material, edgeMaterial: edges.material });
 
     if (isTarget) {
       mapState.targetMeshes.set(fips, { material, edgeMaterial: edges.material });
@@ -240,6 +270,116 @@ function createMapScene() {
       }
     }
   });
+
+  // Use the actual study-state polygons to seed the deer markers; every marker is
+  // sampled inside a state boundary instead of being scattered over a rectangle.
+  const studyFeatures = states.filter((stateFeature) => targetIndex.has(normalizeFips(stateFeature.id)));
+  const deerIconCanvas = document.createElement("canvas");
+  deerIconCanvas.width = 128;
+  deerIconCanvas.height = 128;
+  const deerIconContext = deerIconCanvas.getContext("2d");
+  deerIconContext.font = '92px "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+  deerIconContext.textAlign = "center";
+  deerIconContext.textBaseline = "middle";
+  deerIconContext.fillText("🦌", 64, 68);
+  const deerTexture = new THREE.CanvasTexture(deerIconCanvas);
+  deerTexture.colorSpace = THREE.SRGBColorSpace;
+  studyFeatures.forEach((stateFeature, stateIndex) => {
+    const [[minLon, minLat], [maxLon, maxLat]] = geoBounds(stateFeature);
+    let placed = 0;
+    let attempts = 0;
+    while (placed < 7 && attempts < 600) {
+      attempts += 1;
+      const coordinate = [minLon + Math.random() * (maxLon - minLon), minLat + Math.random() * (maxLat - minLat)];
+      const projected = projection(coordinate);
+      if (!projected || !geoContains(stateFeature, coordinate)) continue;
+      const size = 0.15 + Math.random() * 0.045;
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: deerTexture,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+      }));
+      sprite.position.set(projected[0], -projected[1], 0.1 + stateIndex * 0.0001);
+      sprite.scale.set(size, size, 1);
+      mapGroup.add(sprite);
+      densityDeer.push({ sprite, x: projected[0], y: -projected[1], size, baseOpacity: 0.9 });
+      placed += 1;
+    }
+  });
+
+  const njToSanFrancisco = geoInterpolate([-74.4057, 40.0583], [-122.4194, 37.7749]);
+  const flightCoordinates = Array.from({ length: 49 }, (_, index) => njToSanFrancisco(index / 48));
+  flightCoordinates.push(...flightCoordinates.slice(0, -1).reverse());
+  const flightWaypoints = flightCoordinates.map((coordinate) => {
+    const point = projection(coordinate);
+    return new THREE.Vector3(point[0], -point[1], 0.22);
+  });
+  const flightCurve = new THREE.CatmullRomCurve3(flightWaypoints);
+  const flightPoints = flightCurve.getPoints(200);
+  const flightGeometry = new THREE.BufferGeometry().setFromPoints(flightPoints);
+  flightGeometry.setDrawRange(0, 0);
+  const flightLine = new THREE.Line(
+    flightGeometry,
+    new THREE.LineDashedMaterial({
+      color: 0xf07865,
+      dashSize: 0.09,
+      gapSize: 0.055,
+      transparent: true,
+      opacity: 0.82,
+      depthWrite: false,
+    }),
+  );
+  flightLine.computeLineDistances();
+  mapGroup.add(flightLine);
+
+  const droneCanvas = document.createElement("canvas");
+  droneCanvas.width = 128;
+  droneCanvas.height = 128;
+  const droneContext = droneCanvas.getContext("2d");
+  droneContext.strokeStyle = "#171717";
+  droneContext.fillStyle = "#f3eee7";
+  droneContext.lineWidth = 7;
+  droneContext.lineCap = "round";
+  droneContext.lineJoin = "round";
+  droneContext.beginPath();
+  droneContext.moveTo(51, 50);
+  droneContext.lineTo(28, 30);
+  droneContext.moveTo(77, 50);
+  droneContext.lineTo(100, 30);
+  droneContext.moveTo(51, 76);
+  droneContext.lineTo(28, 98);
+  droneContext.moveTo(77, 76);
+  droneContext.lineTo(100, 98);
+  droneContext.stroke();
+  droneContext.beginPath();
+  droneContext.moveTo(51, 38);
+  droneContext.quadraticCurveTo(64, 34, 77, 38);
+  droneContext.lineTo(84, 76);
+  droneContext.quadraticCurveTo(82, 87, 72, 89);
+  droneContext.lineTo(56, 89);
+  droneContext.quadraticCurveTo(46, 87, 44, 76);
+  droneContext.closePath();
+  droneContext.fill();
+  droneContext.stroke();
+  droneContext.fillStyle = "#f07865";
+  droneContext.beginPath();
+  droneContext.roundRect(53, 87, 22, 11, 3);
+  droneContext.fill();
+  droneContext.stroke();
+  [[28, 30], [100, 30], [28, 98], [100, 98]].forEach(([x, y]) => {
+    droneContext.beginPath();
+    droneContext.ellipse(x, y, 19, 7, Math.PI / 4, 0, Math.PI * 2);
+    droneContext.stroke();
+    droneContext.beginPath();
+    droneContext.arc(x, y, 5, 0, Math.PI * 2);
+    droneContext.fill();
+  });
+  const droneTexture = new THREE.CanvasTexture(droneCanvas);
+  const flightDrone = new THREE.Sprite(new THREE.SpriteMaterial({ map: droneTexture, transparent: true, opacity: 0, depthWrite: false }));
+  flightDrone.scale.set(0.34, 0.34, 1);
+  flightDrone.position.copy(flightCurve.getPoint(0));
+  mapGroup.add(flightDrone);
 
   targetStates.slice(1).forEach((state, index) => {
     const previousCenter = mapState.targetCenters.get(targetStates[index].fips);
@@ -331,6 +471,102 @@ function createMapScene() {
     mapState.view.targetPosition.lerpVectors(mapState.view.heroPosition, storyPosition, engagement);
   }
 
+  function setDensityView(progress = 0, deerVisibility = progress, flightZoomOut = 0) {
+    const amount = clamp(progress);
+    const flightAmount = clamp(flightZoomOut);
+    // Leave the national-footprint story's own target untouched outside this section.
+    if (amount <= 0 && flightAmount <= 0) {
+      densityDeer.forEach(({ sprite }) => {
+        sprite.userData.densityOpacity = 0;
+      });
+      return;
+    }
+    const storyScale = mapState.view.targetScale;
+    const storyPosition = mapState.view.targetPosition.clone();
+    const bounds = targetStateCatalog
+      .map(({ fips }) => mapState.targetBounds.get(fips))
+      .filter(Boolean)
+      .reduce((result, item) => ({
+        minX: Math.min(result.minX, item.minX),
+        maxX: Math.max(result.maxX, item.maxX),
+        minY: Math.min(result.minY, item.minY),
+        maxY: Math.max(result.maxY, item.maxY),
+      }), { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+    if (!Number.isFinite(bounds.minX)) return;
+    const center = new THREE.Vector2((bounds.minX + bounds.maxX) / 2, (bounds.minY + bounds.maxY) / 2);
+    const viewHeight = 2 * camera.position.z * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const viewWidth = viewHeight * camera.aspect;
+    const zoom = Math.min(viewWidth * 0.78 / (bounds.maxX - bounds.minX), viewHeight * 0.72 / (bounds.maxY - bounds.minY), 3.4);
+    const densityPosition = center.clone().multiplyScalar(-zoom);
+    const densityScale = THREE.MathUtils.lerp(storyScale, zoom, amount);
+    const densityTargetPosition = storyPosition.clone().lerp(densityPosition, amount);
+    const fullMapScale = Math.min((viewWidth * 0.84) / 7.4, (viewHeight * 0.82) / 4.7);
+    mapState.view.targetScale = THREE.MathUtils.lerp(densityScale, fullMapScale, flightAmount);
+    mapState.view.targetPosition.copy(densityTargetPosition).lerp(new THREE.Vector2(), flightAmount);
+    densityDeer.forEach(({ sprite, baseOpacity }) => {
+      sprite.userData.densityOpacity = baseOpacity * clamp(deerVisibility);
+    });
+  }
+
+  function setDensityPointer(event, active = true) {
+    densityHeatActive = active;
+    if (!active) return;
+    pointerNdc.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+    mapGroup.updateMatrixWorld(true);
+    camera.updateMatrixWorld();
+    raycaster.setFromCamera(pointerNdc, camera);
+    const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(mapGroup.getWorldQuaternion(new THREE.Quaternion()));
+    heatPlane.setFromNormalAndCoplanarPoint(normal, mapGroup.position);
+    if (raycaster.ray.intersectPlane(heatPlane, heatPoint)) {
+      const localPoint = mapGroup.worldToLocal(heatPoint.clone());
+      densityHeat.position.set(localPoint.x, localPoint.y, 0.18);
+      densityHeat.userData.targetX = localPoint.x;
+      densityHeat.userData.targetY = localPoint.y;
+    }
+  }
+
+  function setTargetDotVisibility(hiddenProgress = 0) {
+    const visibility = 1 - clamp(hiddenProgress);
+    mapState.targetDots.forEach((dot, fips) => {
+      const stateIndex = targetStates.findIndex((state) => state.fips === fips);
+      const active = stateIndex >= 0 && stateIndex < mapState.activeCount;
+      dot.material.opacity = (active ? 0.95 : 0.1) * visibility;
+      dot.scale.setScalar((active ? 1 : 0.2) * visibility);
+    });
+  }
+
+  function setFlightTheme(progress = 0) {
+    const amount = clamp(progress);
+    stateLayers.forEach(({ fips, isTarget, material, edgeMaterial }) => {
+      const stateIndex = targetStates.findIndex((state) => state.fips === fips);
+      const active = isTarget && stateIndex >= 0 && stateIndex < mapState.activeCount;
+      const baseFill = isTarget ? new THREE.Color(active ? 0xa93630 : 0x542522) : new THREE.Color(0x232326);
+      const baseEdge = isTarget ? new THREE.Color(active ? 0xe07167 : 0x8a4a45) : new THREE.Color(0x4a4849);
+      const flightFill = isTarget ? new THREE.Color(0x82a779) : new THREE.Color(0x2b5862);
+      const flightEdge = isTarget ? new THREE.Color(0xc4d5a3) : new THREE.Color(0x6e9da2);
+      material.color.copy(baseFill).lerp(flightFill, amount);
+      edgeMaterial.color.copy(baseEdge).lerp(flightEdge, amount);
+      material.opacity = THREE.MathUtils.lerp(isTarget ? (active ? 0.82 : 0.32) : 0.12, isTarget ? 0.92 : 0.68, amount);
+      edgeMaterial.opacity = THREE.MathUtils.lerp(isTarget ? (active ? 0.86 : 0.28) : 0.16, isTarget ? 0.98 : 0.58, amount);
+    });
+    mapState.targetDots.forEach((dot, fips) => {
+      const stateIndex = targetStates.findIndex((state) => state.fips === fips);
+      const active = stateIndex >= 0 && stateIndex < mapState.activeCount;
+      dot.material.color.setHex(0xd9685e);
+      dot.material.opacity = THREE.MathUtils.lerp(active ? 0.95 : 0.1, 0, amount);
+      dot.scale.setScalar(THREE.MathUtils.lerp(active ? 1 : 0.2, 0, amount));
+    });
+  }
+
+  function setFlightProgress(progress = 0, visibility = 0) {
+    const amount = clamp(progress);
+    const visible = clamp(visibility);
+    flightLine.geometry.setDrawRange(0, Math.floor(flightPoints.length * amount));
+    flightLine.material.opacity = 0.82 * visible;
+    flightDrone.position.copy(flightCurve.getPoint(amount));
+    flightDrone.userData.targetOpacity = visible;
+  }
+
   function resize() {
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -378,6 +614,17 @@ function createMapScene() {
     mapState.view.currentPosition.lerp(mapState.view.targetPosition, viewEase);
     mapGroup.position.set(mapState.view.currentPosition.x, mapState.view.currentPosition.y, 0);
     mapGroup.scale.setScalar(mapState.view.currentScale);
+    densityHeat.material.opacity += ((densityHeatActive ? 0.46 : 0) - densityHeat.material.opacity) * 0.14;
+    flightDrone.material.opacity += ((flightDrone.userData.targetOpacity ?? 0) - flightDrone.material.opacity) * 0.16;
+    densityDeer.forEach(({ sprite, x, y, size }) => {
+      const distance = Math.hypot(x - (densityHeat.userData.targetX ?? 100), y - (densityHeat.userData.targetY ?? 100));
+      const isHovered = densityHeatActive && distance < Math.max(0.09, size * 0.95);
+      const goalOpacity = sprite.userData.densityOpacity ?? 0;
+      sprite.material.opacity += (Math.min(1, goalOpacity + (isHovered ? 0.1 : 0)) - sprite.material.opacity) * 0.2;
+      const scale = size * (isHovered ? 1.42 : 1);
+      sprite.scale.x += (scale - sprite.scale.x) * 0.2;
+      sprite.scale.y += (scale - sprite.scale.y) * 0.2;
+    });
     particles.rotation.z = reducedMotion ? 0 : seconds * 0.002;
     renderer.render(scene, camera);
     requestAnimationFrame(render);
@@ -387,7 +634,7 @@ function createMapScene() {
   window.addEventListener("resize", resize, { passive: true });
   requestAnimationFrame(render);
 
-  return { mapGroup, mount, setStoryView };
+  return { mapGroup, mount, setStoryView, setDensityView, setDensityPointer, setTargetDotVisibility, setFlightProgress, setFlightTheme };
 }
 
 function setMapProgress(progress, engagement, setStoryView) {
@@ -429,12 +676,12 @@ function setMapProgress(progress, engagement, setStoryView) {
   document.getElementById("map-progress-count").textContent = `${activeCount} of 16`;
 }
 
-function createDeerField() {
+function createDeerField(setDensityPointer) {
   const canvas = document.getElementById("deer-canvas");
   const context = canvas.getContext("2d");
   const readout = document.getElementById("deer-count");
-  const totalDots = 549;
-  let activeDots = reducedMotion ? totalDots : 0;
+  const totalDeer = 112;
+  let activeDeer = reducedMotion ? totalDeer : 0;
   let cachedWidth = 0;
   let cachedHeight = 0;
   let heatFrame = 0;
@@ -446,11 +693,6 @@ function createDeerField() {
     targetY: 0,
     intensity: 0,
   };
-
-  function randomFor(index) {
-    const value = Math.sin(index * 12.9898 + 78.233) * 43758.5453;
-    return value - Math.floor(value);
-  }
 
   function draw() {
     const rect = canvas.getBoundingClientRect();
@@ -464,60 +706,21 @@ function createDeerField() {
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
     context.clearRect(0, 0, rect.width, rect.height);
 
-    const columns = rect.width < 640 ? 19 : 31;
-    const rows = Math.ceil(totalDots / columns);
-    const marginX = rect.width < 640 ? 18 : 32;
-    const marginY = 34;
-    const spacingX = (rect.width - marginX * 2) / Math.max(1, columns - 1);
-    const spacingY = (rect.height - marginY * 2) / Math.max(1, rows - 1);
-    const radius = Math.max(1.7, Math.min(4.2, spacingX * 0.13));
-    const heatRadius = Math.max(105, Math.min(190, rect.width * 0.18));
-
+    const heatRadius = Math.max(85, Math.min(170, rect.width * 0.14));
     if (heat.intensity > 0.01) {
-      const halo = context.createRadialGradient(heat.x, heat.y, 0, heat.x, heat.y, heatRadius * 1.22);
-      halo.addColorStop(0, `rgba(224, 69, 59, ${0.34 * heat.intensity})`);
-      halo.addColorStop(0.3, `rgba(181, 58, 50, ${0.24 * heat.intensity})`);
-      halo.addColorStop(0.62, `rgba(217, 104, 94, ${0.1 * heat.intensity})`);
-      halo.addColorStop(1, "rgba(181, 58, 50, 0)");
-      context.fillStyle = halo;
+      const heatGlow = context.createRadialGradient(heat.x, heat.y, 0, heat.x, heat.y, heatRadius);
+      heatGlow.addColorStop(0, `rgba(243, 98, 74, ${0.25 * heat.intensity})`);
+      heatGlow.addColorStop(0.38, `rgba(208, 67, 55, ${0.15 * heat.intensity})`);
+      heatGlow.addColorStop(1, "rgba(224, 115, 85, 0)");
+      context.fillStyle = heatGlow;
       context.fillRect(0, 0, rect.width, rect.height);
     }
 
-    for (let index = 0; index < totalDots; index += 1) {
-      const column = index % columns;
-      const row = Math.floor(index / columns);
-      const offsetX = (randomFor(index) - 0.5) * spacingX * 0.34;
-      const offsetY = (randomFor(index + 1000) - 0.5) * spacingY * 0.34;
-      const x = marginX + column * spacingX + offsetX;
-      const y = marginY + row * spacingY + offsetY;
-      const active = index < activeDots;
-      const distance = Math.hypot(x - heat.x, y - heat.y);
-      const proximity = heat.intensity * Math.max(0, 1 - distance / heatRadius);
-      const heatStrength = Math.pow(proximity, 1.45);
-      const red = Math.round(196 + 55 * heatStrength);
-      const green = Math.round(195 - 87 * heatStrength);
-      const blue = Math.round(190 - 92 * heatStrength);
-
-      context.beginPath();
-      context.arc(x, y, active ? radius * (1 + heatStrength * 1.15) : radius * 0.72, 0, Math.PI * 2);
-      context.fillStyle = active
-        ? `rgba(${red}, ${green}, ${blue}, ${0.84 + heatStrength * 0.16})`
-        : "rgba(210, 205, 202, 0.1)";
-      context.fill();
-
-      if (active && (index % 17 === 0 || heatStrength > 0.64)) {
-        context.beginPath();
-        context.arc(x, y, radius * (2.8 + heatStrength * 1.8), 0, Math.PI * 2);
-        context.strokeStyle = `rgba(224, 69, 59, ${0.12 + heatStrength * 0.28})`;
-        context.stroke();
-      }
-    }
-
-    readout.textContent = formatNumber((activeDots / totalDots) * 54820);
+    readout.textContent = formatNumber((activeDeer / totalDeer) * 54820);
   }
 
   function setProgress(progress) {
-    activeDots = Math.round(totalDots * clamp(progress));
+    activeDeer = Math.round(totalDeer * clamp(progress));
     draw();
   }
 
@@ -530,6 +733,7 @@ function createDeerField() {
       heat.y = heat.targetY;
     }
     heat.active = true;
+    setDensityPointer(event, true);
     startHeatAnimation();
   }
 
@@ -552,6 +756,7 @@ function createDeerField() {
   canvas.addEventListener("pointerenter", setHeatTarget, { passive: true });
   canvas.addEventListener("pointerleave", () => {
     heat.active = false;
+    setDensityPointer(null, false);
     startHeatAnimation();
   }, { passive: true });
 
@@ -580,8 +785,8 @@ function animateCounter(element) {
   });
 }
 
-const { mount: mapMount, setStoryView } = createMapScene();
-const deerField = createDeerField();
+const { mount: mapMount, setStoryView, setDensityView, setDensityPointer, setTargetDotVisibility, setFlightProgress, setFlightTheme } = createMapScene();
+const deerField = createDeerField(setDensityPointer);
 const hero = document.getElementById("top");
 const mapStory = document.getElementById("reach");
 const evidence = document.getElementById("evidence");
@@ -589,7 +794,6 @@ const flight = document.getElementById("flight");
 const coverage = document.getElementById("coverage");
 const closing = document.querySelector(".closing");
 const siteHeader = document.getElementById("site-header");
-const flightRoute = document.getElementById("flight-route");
 
 function setupMotionAnimations() {
   if (reducedMotion) {
@@ -710,13 +914,32 @@ function updateScrollStory() {
   const evidenceRect = evidence.getBoundingClientRect();
   const evidenceProgress = clamp((viewportHeight * 0.82 - evidenceRect.top) / Math.max(1, evidenceRect.height * 0.54));
   deerField.setProgress(reducedMotion ? 1 : evidenceProgress);
+  const densityIn = clamp((viewportHeight * 0.82 - evidenceRect.top) / Math.max(1, evidenceRect.height * 0.2));
+  const densityOut = clamp((evidenceRect.bottom - viewportHeight * 0.38) / Math.max(1, evidenceRect.height * 0.2));
 
   const flightRect = flight.getBoundingClientRect();
-  const flightProgress = clamp((viewportHeight * 0.78 - flightRect.top) / Math.max(1, flightRect.height * 0.52));
-  flightRoute.style.setProperty("--route-progress", `${(reducedMotion ? 1 : flightProgress) * 100}%`);
+  const flightTriggerY = viewportHeight * 0.55;
+  const flightProgress = clamp((flightTriggerY - flightRect.top) / Math.max(1, flightRect.height * 0.85));
+  const flightViewIn = clamp((viewportHeight * 0.82 - flightRect.top) / Math.max(1, flightRect.height * 0.2));
+  const flightViewOut = clamp((flightRect.bottom - viewportHeight * 0.38) / Math.max(1, flightRect.height * 0.2));
+  const flightViewProgress = Math.min(flightViewIn, flightViewOut);
+  const flightAnimationIn = clamp((flightTriggerY - flightRect.top) / Math.max(1, viewportHeight * 0.12));
+  const flightAnimationOut = clamp((flightRect.bottom - viewportHeight * 0.12) / Math.max(1, viewportHeight * 0.14));
+  const flightAnimationVisibility = Math.min(flightAnimationIn, flightAnimationOut);
+  const deerVisibility = 1 - flightAnimationIn;
+  const densitySectionProgress = Math.min(densityIn, densityOut);
+  const densityViewProgress = Math.max(densitySectionProgress, flightViewProgress);
+  setDensityView(densityViewProgress, deerVisibility, flightViewProgress);
+  setFlightProgress(reducedMotion ? 1 : flightProgress, reducedMotion ? flightViewProgress : flightAnimationVisibility);
+  setFlightTheme(flightViewProgress);
+  const coverageRect = coverage.getBoundingClientRect();
+  const coverageDotsIn = clamp((viewportHeight * 0.82 - coverageRect.top) / Math.max(1, coverageRect.height * 0.2));
+  const coverageDotsOut = clamp((coverageRect.bottom - viewportHeight * 0.38) / Math.max(1, coverageRect.height * 0.2));
+  const coverageDotsProgress = Math.min(coverageDotsIn, coverageDotsOut);
+  setTargetDotVisibility(Math.max(densityViewProgress, coverageDotsProgress));
 
   const pageProgress = window.scrollY / Math.max(1, document.documentElement.scrollHeight - viewportHeight);
-  mapMount.style.opacity = String(clamp(1 - pageProgress * 0.8, 0.22, 1));
+  mapMount.style.opacity = String(Math.max(clamp(1 - pageProgress * 0.8, 0.22, 1), densityViewProgress * 0.95));
   siteHeader.classList.toggle("is-scrolled", window.scrollY > 32);
 }
 

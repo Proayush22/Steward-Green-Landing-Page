@@ -105,19 +105,23 @@
       <section class="evidence" id="evidence" aria-labelledby="evidence-title">
         <div class="section-kicker reveal">02 / Evidence at scale</div>
         <div class="evidence__intro reveal">
-          <h2 id="evidence-title">Move through the field.<br /><em>See density come alive.</em></h2>
+          <h2 id="evidence-title">Zoom into the field.<br /><em>See deer density come alive.</em></h2>
           <p>
-            Each point represents one hundred confirmed deer. Move across the field to reveal a thermal-style density lens within the cumulative study record.
+            The same U.S. map expands into the study footprint. Move or tap across the deer markers to reveal a thermal-style density lens.
           </p>
         </div>
 
         <div class="deer-field reveal">
-          <canvas id="deer-canvas" role="img" aria-label="Interactive thermal density field representing approximately 54,820 confirmed deer, where each point represents 100 deer"></canvas>
-          <div class="deer-field__hint" aria-hidden="true"><i></i> Move or tap to scan</div>
+          <canvas id="deer-canvas" role="img" aria-label="Zoomed U.S. state map with deer markers across the study footprint. Hover or tap to reveal thermal density"></canvas>
+          <div class="deer-field__hint" aria-hidden="true"><i></i> Move to scan</div>
+          <div class="deer-field__legend" aria-label="Map legend: one deer marker represents approximately 490 confirmed deer">
+            <span aria-hidden="true">🦌</span>
+            <span>1 marker ≈ 490 confirmed deer</span>
+          </div>
           <div class="deer-field__readout">
             <span>Approximate deer confirmed</span>
             <strong id="deer-count">0</strong>
-            <small>Each point = 100 deer</small>
+            <small>Thermal survey footprint</small>
           </div>
         </div>
 
@@ -149,19 +153,9 @@
           </p>
         </div>
 
-        <div class="flight-route reveal" id="flight-route">
-          <div class="flight-route__label flight-route__label--start">
-            <span>Start</span>
-            <strong>Portland, ME</strong>
-          </div>
-          <div class="flight-route__line" aria-hidden="true">
-            <div class="flight-route__fill"></div>
-            <div class="flight-route__drone">AIR</div>
-          </div>
-          <div class="flight-route__label flight-route__label--end">
-            <span>West, then halfway back</span>
-            <strong>6,452 miles</strong>
-          </div>
+        <div class="flight-distance-legend reveal" aria-label="Cumulative UAS flight distance: 6,452 miles">
+          <span class="flight-distance-legend__icon" aria-hidden="true">↔</span>
+          <span><strong>6,452 miles</strong><small>Cumulative distance · shown as an NJ–San Francisco round trip</small></span>
         </div>
 
         <div class="flight__stats reveal">

@@ -510,7 +510,7 @@ h2 em {
 .evidence {
   padding-top: 11rem;
   padding-bottom: 11rem;
-  background: linear-gradient(180deg, transparent, rgba(24, 19, 19, 0.88) 25%, rgba(18, 16, 16, 0.94) 78%, transparent);
+  background: linear-gradient(180deg, transparent, rgba(24, 19, 19, 0.34) 25%, rgba(18, 16, 16, 0.38) 78%, transparent);
 }
 
 .evidence__intro {
@@ -540,7 +540,7 @@ h2 em {
 .deer-field::after {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 45% 50%, transparent 20%, rgba(8, 8, 8, 0.58) 100%);
+  background: radial-gradient(circle at 45% 50%, transparent 46%, rgba(8, 8, 8, 0.16) 100%);
   content: "";
   pointer-events: none;
 }
@@ -581,6 +581,27 @@ h2 em {
   border-radius: 50%;
   box-shadow: 0 0 0 0 rgba(181, 58, 50, 0.42);
   animation: scan-pulse 2.2s ease-out infinite;
+}
+
+.deer-field__legend {
+  position: absolute;
+  top: clamp(1.2rem, 3vw, 2.5rem);
+  right: clamp(1rem, 3vw, 2.5rem);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  background: rgba(8, 8, 8, 0.72);
+  color: rgba(244, 242, 237, 0.82);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.deer-field__legend span:first-child {
+  font-size: 1.05rem;
+  line-height: 1;
 }
 
 @keyframes scan-pulse {
@@ -667,6 +688,21 @@ h2 em {
   padding-bottom: 12rem;
 }
 
+.flight .section-kicker,
+.flight__index {
+  color: #b8d1a9;
+}
+
+.flight__copy h2,
+.flight__stats strong,
+.flight-distance-legend strong {
+  color: #e0ece7;
+}
+
+.flight__copy h2 em {
+  color: #a8c99b;
+}
+
 .flight__copy {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -680,87 +716,44 @@ h2 em {
 .flight__copy p {
   align-self: end;
   margin: 0 0 0.7rem;
-  color: var(--muted);
+  color: #bdcfca;
   font-size: 1.05rem;
   line-height: 1.7;
 }
 
-.flight-route {
-  --route-progress: 0%;
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(10rem, 1fr) auto;
+.flight-distance-legend {
+  display: flex;
   align-items: center;
-  gap: 1.3rem;
-  margin: 7rem 0 5rem;
+  gap: 1rem;
+  width: fit-content;
+  margin: 4rem 0 5rem;
+  padding-left: 1.1rem;
+  border-left: 1px solid #a8c99b;
 }
 
-.flight-route__label span {
+.flight-distance-legend__icon {
+  color: #a8c99b;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.flight-distance-legend strong,
+.flight-distance-legend small {
   display: block;
-  margin-bottom: 0.25rem;
-  color: var(--muted);
-  font-size: 0.65rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
-.flight-route__label strong {
+.flight-distance-legend strong {
   font-family: "Source Serif 4", serif;
-  font-size: 1.35rem;
+  font-size: 1.55rem;
   font-weight: 400;
 }
 
-.flight-route__label--end {
-  text-align: right;
-}
-
-.flight-route__line {
-  position: relative;
-  height: 1px;
-  background: var(--line);
-}
-
-.flight-route__line::before,
-.flight-route__line::after {
-  position: absolute;
-  top: 50%;
-  width: 0.65rem;
-  height: 0.65rem;
-  border: 1px solid var(--muted);
-  border-radius: 50%;
-  background: var(--forest-950);
-  content: "";
-  transform: translateY(-50%);
-}
-
-.flight-route__line::before { left: 0; }
-.flight-route__line::after { right: 0; }
-
-.flight-route__fill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: var(--route-progress);
-  height: 1px;
-  background: var(--lime);
-}
-
-.flight-route__drone {
-  position: absolute;
-  top: 50%;
-  left: var(--route-progress);
-  display: grid;
-  width: 3.15rem;
-  height: 3.15rem;
-  place-items: center;
-  border: 1px solid var(--lime);
-  border-radius: 50%;
-  background: var(--forest-950);
-  color: var(--lime);
-  font-size: 0.55rem;
-  font-weight: 600;
+.flight-distance-legend small {
+  margin-top: 0.15rem;
+  color: #9fb7b3;
+  font-size: 0.68rem;
   letter-spacing: 0.08em;
-  transform: translate(-50%, -50%);
+  text-transform: uppercase;
 }
 
 .flight__stats {
@@ -771,12 +764,15 @@ h2 em {
 
 .flight__stats article {
   padding-top: 1.3rem;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid rgba(123, 165, 165, 0.45);
 }
 
 .flight__index {
-  display: block;
-  color: var(--lime);
+  display: inline-block;
+  padding: 0.18rem 0.35rem;
+  border-radius: 2px;
+  background: #bfd8cc;
+  color: #173c55;
   font-size: 0.68rem;
 }
 
@@ -792,7 +788,7 @@ h2 em {
 
 .flight__stats p {
   max-width: 20rem;
-  color: var(--muted);
+  color: #a9beb9;
   font-size: 0.86rem;
   line-height: 1.55;
 }
@@ -1290,6 +1286,13 @@ h2 em {
     margin-top: 3rem;
   }
 
+  .deer-field__legend {
+    top: 3.8rem;
+    right: auto;
+    left: 1rem;
+    font-size: 0.62rem;
+  }
+
   .deer-field__readout {
     right: 1rem;
     bottom: 1.5rem;
@@ -1315,20 +1318,8 @@ h2 em {
     padding-left: 0;
   }
 
-  .flight-route {
-    grid-template-columns: 1fr;
-    gap: 1.6rem;
-    margin: 5rem 0 4rem;
-  }
-
-  .flight-route__line {
-    grid-row: 2;
-    width: calc(100% - 2rem);
-    margin: 0 1rem;
-  }
-
-  .flight-route__label--end {
-    text-align: left;
+  .flight-distance-legend {
+    margin: 3rem 0 4rem;
   }
 
   .flight__stats {
